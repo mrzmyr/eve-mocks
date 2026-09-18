@@ -66,7 +66,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
   if (match) {
     logCall({ outcome: "mocked", target: match.name, method, url });
-    return match.mock.handle(new Request(input, init));
+    return match.mock.handle(new Request(input, init), { name: match.name });
   }
 
   const { protocol, hostname, host } = new URL(url);

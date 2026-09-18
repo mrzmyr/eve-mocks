@@ -51,7 +51,6 @@ import { defineMcpMock } from "eve-mocks";
 
 export default defineMcpMock({
   url: "https://tracker.example.com/mcp",
-  tools: "./snapshots/tracker.tools.json",
   // Snapshot tools the mock does not list, such as mutations a read-only connection never allows.
   omit: ["create_issue"],
   pull: {
@@ -76,7 +75,6 @@ import { defineHttpMock } from "eve-mocks";
 
 export default defineHttpMock({
   url: "https://api.notion.com/",
-  spec: "./snapshots/notion.openapi.json",
   source: "https://developers.notion.com/openapi.json",
   routes: {
     "/v1/search": {
@@ -104,9 +102,13 @@ export default defineHttpMock({
   one); pin anything an eval asserts on.
 - **Neither** answers 404, so a call the real API would reject does not pass
   silently.
-- **Without a `spec`**, only the routes answer.
+- **Without `source` and without a snapshot**, only the routes answer.
 
-Snapshot paths are relative to the mocks directory.
+A mock file never spells a snapshot path. The file name decides it:
+`mocks/notion.ts` reads `mocks/snapshots/notion.openapi.json`, and
+`mocks/tracker.ts` reads `mocks/snapshots/tracker.tools.json`. Commit the
+snapshots: evals then run offline and without credentials, and a changed tool
+description shows up as a diff instead of as an eval that fails on one machine.
 
 ## Checks before a run
 
@@ -122,7 +124,13 @@ eve-mocks: No result for tool "list_initiatives" of https://tracker.example.com/
 ```
 
 So a refreshed snapshot with a new tool fails the next run until someone
-writes its result.
+writes its result. A snapshot that was never pulled stops the run too:
+
+```
+eve-mocks: No snapshot for notion at mocks/snapshots/notion.openapi.json
+  why: The mock answers from the OpenAPI document of https://developers.notion.com/openapi.json, and it has not been pulled
+  fix: Run: eve-mocks pull notion
+```
 
 ## Snapshots: `pull` and `add`
 
@@ -132,8 +140,8 @@ eve-mocks pull notion     # one mock
 eve-mocks add catalog     # scaffold mocks/catalog.ts from eve's manifest
 ```
 
-`pull` downloads `source` into `spec`, and the real `tools/list` of an MCP
-mock's `url` into `tools`. One failing upstream does not stop the others.
+`pull` downloads a REST mock's `source`, and the real `tools/list` of an MCP
+mock's `url`, into `mocks/snapshots/`. One failing upstream does not stop the others.
 `pull.headers` authenticates the request and must be self-contained: read the
 environment, do not import app code. A server behind user OAuth needs a
 signed-in user's bearer token.

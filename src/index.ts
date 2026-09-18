@@ -7,6 +7,7 @@ export type {
   Allowed,
   CallRecord,
   Mock,
+  MockContext,
   PullOptions,
   RouteContext,
   RouteHandler,

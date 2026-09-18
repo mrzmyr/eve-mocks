@@ -1,3 +1,9 @@
+/** What eve-mocks tells a mock about itself when it calls it. */
+export type MockContext = {
+  /** The mock's file name without extension; names its snapshot. */
+  readonly name: string;
+};
+
 /**
  * One mocked upstream: every `fetch` whose URL starts with `url` is answered
  * by `handle` inside the calling process, so no request leaves the machine.
@@ -6,7 +12,7 @@ export type Mock = {
   /** Production URL prefix the agent calls. */
   readonly url: string;
   /** Answers one intercepted request. */
-  readonly handle: (request: Request) => Promise<Response>;
+  readonly handle: (request: Request, context: MockContext) => Promise<Response>;
   /**
    * Environment variables the mocked code path reads before it fetches.
    * Applied only where the variable is unset, so a real value always wins.
@@ -19,13 +25,13 @@ export type Mock = {
    *
    * @throws MockError when the mock and its snapshot disagree.
    */
-  readonly check?: () => Promise<void>;
+  readonly check?: (context: MockContext) => Promise<void>;
   /**
    * Refreshes the mock's snapshot from the real upstream.
    *
    * @returns The path written, or `undefined` when the mock names no source.
    */
-  readonly pull?: () => Promise<string | undefined>;
+  readonly pull?: (context: MockContext) => Promise<string | undefined>;
 };
 
 /** How `eve-mocks pull` reaches the real upstream. */

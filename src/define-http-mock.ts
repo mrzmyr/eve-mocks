@@ -1,11 +1,12 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 import { sample } from "openapi-sampler";
 
 import { createError, MockError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
-import { resolvePath } from "./resolve-path.ts";
-import type { Mock, PullOptions, Routes } from "./types.ts";
+import { getSnapshotPath } from "./get-snapshot-path.ts";
+import type { Mock, MockContext, PullOptions, Routes } from "./types.ts";
 
 /** A JSON object node of an OpenAPI document. */
 type Node = { readonly [key: string]: unknown };
@@ -136,24 +137,24 @@ function toResponse(result: unknown): Response {
  * smoke-test data; pin what an eval asserts on. A request that matches neither
  * answers 404, so a call the real API would reject does not pass silently.
  *
+ * The OpenAPI document is the snapshot `snapshots/<mock>.openapi.json`, which
+ * `eve-mocks pull` downloads from `source`. It is read on the first request,
+ * so processes that never call this upstream do not pay for it. A mock with
+ * neither `source` nor a snapshot answers from its routes alone.
+ *
  * @param input.url - Production URL prefix the paths hang off.
- * @param input.spec - Snapshot of the OpenAPI JSON: a file URL, or a path
- *   relative to the mocks directory. Read on the first request, so processes
- *   that never call this upstream do not pay for it.
- * @param input.source - Where `eve-mocks pull` downloads `spec` from.
+ * @param input.source - URL of the upstream's OpenAPI JSON.
  * @param input.pull - How `eve-mocks pull` authenticates against `source`.
- * @param input.routes - Pinned answers, path then method. With a `spec`, every
- *   route must name an operation the spec declares; `check` enforces it.
+ * @param input.routes - Pinned answers, path then method. With a snapshot,
+ *   every route must name an operation it declares; `check` enforces it.
  */
 export function defineHttpMock({
   url,
-  spec,
   source,
   pull,
   routes = {},
 }: {
   readonly url: string;
-  readonly spec?: string | URL;
   readonly source?: string;
   readonly pull?: PullOptions;
   readonly routes?: Routes;
@@ -166,21 +167,40 @@ export function defineHttpMock({
 
   let document: Node | undefined;
 
-  /** The parsed spec, or an empty document for a routes-only mock. */
-  const loadSpec = (): Node => {
-    if (spec === undefined) {
-      return {};
+  /**
+   * The parsed snapshot, or an empty document for a routes-only mock.
+   *
+   * @throws MockError when the mock names a `source` that was never pulled.
+   */
+  const loadSpec = ({ name }: MockContext): Node => {
+    if (document !== undefined) {
+      return document;
     }
 
-    document ??= JSON.parse(readFileSync(resolvePath({ path: spec }), "utf8")) as Node;
+    const path = getSnapshotPath({ name, kind: "openapi" });
+
+    if (!existsSync(path)) {
+      if (source === undefined) {
+        return {};
+      }
+
+      throw createError({
+        status: 404,
+        message: `No snapshot for ${name} at ${path}`,
+        why: `The mock answers from the OpenAPI document of ${source}, and it has not been pulled`,
+        fix: `Run: eve-mocks pull ${name}`,
+      });
+    }
+
+    document = JSON.parse(readFileSync(path, "utf8")) as Node;
 
     return document;
   };
 
   return {
     url,
-    handle: async (request) => {
-      const loaded = loadSpec();
+    handle: async (request, context) => {
+      const loaded = loadSpec(context);
       const paths = getNode(loaded.paths);
       const path = new URL(request.url).pathname.slice(basePath.length);
       const match = matchTemplate({
@@ -193,7 +213,7 @@ export function defineHttpMock({
           status: 404,
           message: `No route or operation for ${request.method} ${path}`,
           why: "Neither the mock's routes nor its OpenAPI document declare this path",
-          fix: "Check the request against the spec, pin a route, or refresh the spec with eve-mocks pull",
+          fix: "Check the request against the spec, pin a route, or refresh the snapshot with eve-mocks pull",
         });
       }
 
@@ -253,12 +273,15 @@ export function defineHttpMock({
         status: Number(code),
       });
     },
-    check: async () => {
-      if (spec === undefined) {
+    check: async (context) => {
+      const loaded = loadSpec(context);
+
+      // Routes-only mock: nothing to hold the routes against.
+      if (loaded.paths === undefined) {
         return;
       }
 
-      const paths = getNode(loadSpec().paths);
+      const paths = getNode(loaded.paths);
 
       for (const [template, handlers] of Object.entries(routes)) {
         for (const method of Object.keys(handlers)) {
@@ -278,14 +301,14 @@ export function defineHttpMock({
           throw createError({
             status: 500,
             message: `Route ${method} ${template} matches no operation of ${url}`,
-            why: "The mock has a spec, and the spec declares no such method and path, so the real API would reject this call",
+            why: "The snapshot declares no such method and path, so the real API would reject this call",
             fix: `Did you mean ${closest}? Paths use the spec's {param} syntax and methods are upper-case`,
           });
         }
       }
     },
-    pull: async () => {
-      if (spec === undefined || source === undefined) {
+    pull: async ({ name }) => {
+      if (source === undefined) {
         return undefined;
       }
 
@@ -306,7 +329,8 @@ export function defineHttpMock({
           });
         }
 
-        const path = resolvePath({ path: spec });
+        const path = getSnapshotPath({ name, kind: "openapi" });
+        mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, `${JSON.stringify(await response.json(), null, 2)}\n`);
 
         return path;

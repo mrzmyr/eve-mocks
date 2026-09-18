@@ -1,9 +1,10 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 import { createError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
-import { resolvePath } from "./resolve-path.ts";
-import type { Mock, PullOptions, ToolResult } from "./types.ts";
+import { getSnapshotPath } from "./get-snapshot-path.ts";
+import type { Mock, MockContext, PullOptions, ToolResult } from "./types.ts";
 
 /** A tool as `tools/list` returns it. The model reads all three fields. */
 type Tool = {
@@ -14,7 +15,8 @@ type Tool = {
 
 /**
  * Mock a hosted MCP server from a snapshot of its `tools/list` and a result
- * per tool.
+ * per tool. The snapshot is `snapshots/<mock>.tools.json`, which
+ * `eve-mocks pull` writes.
  *
  * The snapshot carries the real names, descriptions, and schemas, because the
  * model reads them: a paraphrased description makes an eval test a different
@@ -27,8 +29,6 @@ type Tool = {
  *
  * @param input.url - Production MCP endpoint to intercept, and what
  *   `eve-mocks pull` snapshots.
- * @param input.tools - Snapshot of `tools/list`: a file URL, or a path relative
- *   to the mocks directory.
  * @param input.results - Answer per tool. Every served tool needs one and
  *   every key must name a snapshot tool; `check` enforces both.
  * @param input.omit - Snapshot tools the mock does not list, such as the
@@ -37,33 +37,50 @@ type Tool = {
  */
 export function defineMcpMock({
   url,
-  tools,
   results,
   omit = [],
   pull,
 }: {
   readonly url: string;
-  readonly tools: string | URL;
   readonly results: Readonly<Record<string, ToolResult>>;
   readonly omit?: readonly string[];
   readonly pull?: PullOptions;
 }): Mock {
   let snapshot: readonly Tool[] | undefined;
 
-  /** Snapshot tools the mock serves: all but the omitted ones. */
-  const loadTools = (): readonly Tool[] => {
-    snapshot ??= (
-      JSON.parse(readFileSync(resolvePath({ path: tools }), "utf8")) as { readonly tools: Tool[] }
-    ).tools.filter(({ name }) => {
-      return !omit.includes(name);
-    });
+  /**
+   * Snapshot tools the mock serves: all but the omitted ones.
+   *
+   * @throws MockError when the snapshot was never pulled.
+   */
+  const loadTools = ({ name }: MockContext): readonly Tool[] => {
+    if (snapshot !== undefined) {
+      return snapshot;
+    }
+
+    const path = getSnapshotPath({ name, kind: "tools" });
+
+    if (!existsSync(path)) {
+      throw createError({
+        status: 404,
+        message: `No snapshot for ${name} at ${path}`,
+        why: `The mock lists the tools of ${url} from a snapshot of its tools/list, and it has not been pulled`,
+        fix: `Run: eve-mocks pull ${name}`,
+      });
+    }
+
+    snapshot = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools.filter(
+      (tool) => {
+        return !omit.includes(tool.name);
+      },
+    );
 
     return snapshot;
   };
 
   return {
     url,
-    handle: async (request) => {
+    handle: async (request, context) => {
       // Imported on the first call: the preload runs in every process the
       // agent spawns, and most of them never talk to this server.
       const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
@@ -79,7 +96,7 @@ export function defineMcpMock({
       );
 
       server.setRequestHandler(ListToolsRequestSchema, () => {
-        return { tools: [...loadTools()] };
+        return { tools: [...loadTools(context)] };
       });
 
       server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
@@ -104,8 +121,8 @@ export function defineMcpMock({
 
       return transport.handleRequest(request);
     },
-    check: async () => {
-      const names = loadTools().map(({ name }) => {
+    check: async (context) => {
+      const names = loadTools(context).map(({ name }) => {
         return name;
       });
 
@@ -131,7 +148,7 @@ export function defineMcpMock({
         }
       }
     },
-    pull: async () => {
+    pull: async ({ name }) => {
       const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
       const { StreamableHTTPClientTransport } = await import(
         "@modelcontextprotocol/sdk/client/streamableHttp.js"
@@ -146,7 +163,8 @@ export function defineMcpMock({
         // `Transport` under `exactOptionalPropertyTypes`.
         await client.connect(transport as Parameters<typeof client.connect>[0]);
         const listed = await client.listTools();
-        const path = resolvePath({ path: tools });
+        const path = getSnapshotPath({ name, kind: "tools" });
+        mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, `${JSON.stringify({ tools: listed.tools }, null, 2)}\n`);
 
         return path;

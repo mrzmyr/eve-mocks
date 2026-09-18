@@ -84,8 +84,8 @@ function reportCalls({ log }: { readonly log: string }): void {
 async function checkMocks({ dir }: { readonly dir: string }): Promise<Awaited<ReturnType<typeof loadMocks>>> {
   const loaded = await loadMocks({ dir });
 
-  for (const { mock } of loaded.mocks) {
-    await mock.check?.();
+  for (const { name, mock } of loaded.mocks) {
+    await mock.check?.({ name });
   }
 
   return loaded;
@@ -220,7 +220,7 @@ async function pull({ dir, name }: { readonly dir: string; readonly name: string
   // One upstream being down or unauthenticated must not stop the others.
   for (const entry of selected) {
     try {
-      const path = await entry.mock.pull?.();
+      const path = await entry.mock.pull?.({ name: entry.name });
 
       if (path === undefined) {
         console.log(`${entry.name.padEnd(24)}skipped: no snapshot source`);
@@ -249,8 +249,7 @@ function createScaffold({ name, url, protocol }: { readonly name: string; readon
 
 export default defineMcpMock({
   url: "${url}",
-  // Snapshot it with: eve-mocks pull ${name}
-  tools: "./snapshots/${name}.tools.json",
+  // Snapshot its tools/list with: eve-mocks pull ${name}
   pull: {
     headers: async () => {
       return { authorization: \`Bearer \${process.env.${name.toUpperCase().replaceAll("-", "_")}_TOKEN}\` };
@@ -266,9 +265,8 @@ export default defineMcpMock({
 
 export default defineHttpMock({
   url: "${url}",
-  // Set source to the upstream's OpenAPI JSON, then: eve-mocks pull ${name}
-  spec: "./snapshots/${name}.openapi.json",
-  source: "",
+  // Name the upstream's OpenAPI JSON, then run: eve-mocks pull ${name}
+  // source: "https://…/openapi.json",
   // Pin what evals assert on: routes: { "/path/{id}": { GET: ({ params }) => ({}) } }
   routes: {},
 });
@@ -311,7 +309,6 @@ function add({ dir, name }: { readonly dir: string; readonly name: string | unde
     });
   }
 
-  mkdirSync(join(dir, "snapshots"), { recursive: true });
   writeFileSync(path, createScaffold({ name, url: connection.url, protocol: connection.protocol }));
   console.log(`created ${path}`);
 }
