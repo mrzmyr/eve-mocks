@@ -1,0 +1,14 @@
+{
+  "tools": [
+    {
+      "name": "get_issue",
+      "description": "Retrieve a single issue by id or identifier.",
+      "inputSchema": { "type": "object", "properties": { "id": { "type": "string" } }, "required": ["id"] }
+    },
+    {
+      "name": "create_issue",
+      "description": "Create an issue.",
+      "inputSchema": { "type": "object", "properties": { "title": { "type": "string" } } }
+    }
+  ]
+}

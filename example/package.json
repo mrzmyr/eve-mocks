@@ -1,0 +1,8 @@
+{
+  "name": "eve-mocks-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "eve-mocks -- node check.ts"
+  }
+}

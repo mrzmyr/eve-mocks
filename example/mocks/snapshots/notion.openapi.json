@@ -1,0 +1,33 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Notion, cut down for the example", "version": "1" },
+  "paths": {
+    "/v1/search": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": { "type": "array", "items": { "$ref": "#/components/schemas/Page" } },
+                    "next_cursor": { "type": ["string", "null"] }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user_id}": {
+      "get": { "responses": { "200": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } } } }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Page": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "object": { "type": "string" } } }
+    }
+  }
+}
