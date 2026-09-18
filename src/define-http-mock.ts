@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { sample } from "openapi-sampler";
 
-import { createError } from "./errors.ts";
+import { createError, MockError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
 import { resolvePath } from "./resolve-path.ts";
 import type { Mock, PullOptions, Routes } from "./types.ts";
@@ -218,9 +218,13 @@ export function defineHttpMock({
       const responses = getNode(operation.responses);
       const code = Object.keys(responses)
         .filter((key) => {
-          return key.startsWith("2");
+          const status = Number(key);
+
+          return Number.isInteger(status) && status >= 200 && status < 300;
         })
-        .sort()[0];
+        .sort((a, b) => {
+          return Number(a) - Number(b);
+        })[0];
 
       if (code === undefined) {
         return respondError({
@@ -285,26 +289,40 @@ export function defineHttpMock({
         return undefined;
       }
 
-      // `redirect: "error"`: a protected spec redirects to a login page, which
-      // would otherwise be followed and fail later as unparseable JSON.
-      const response = await fetch(source, {
-        headers: (await pull?.headers?.()) ?? {},
-        redirect: "error",
-      });
+      try {
+        // `redirect: "error"`: a protected spec redirects to a login page, which
+        // would otherwise be followed and fail later as unparseable JSON.
+        const response = await fetch(source, {
+          headers: (await pull?.headers?.()) ?? {},
+          redirect: "error",
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          throw createError({
+            status: 502,
+            message: `OpenAPI spec download failed for ${source}`,
+            why: `The server answered ${response.status}`,
+            fix: "Check the source URL and the credentials pull.headers reads",
+          });
+        }
+
+        const path = resolvePath({ path: spec });
+        writeFileSync(path, `${JSON.stringify(await response.json(), null, 2)}\n`);
+
+        return path;
+      } catch (cause) {
+        if (cause instanceof MockError) {
+          throw cause;
+        }
+
         throw createError({
           status: 502,
           message: `OpenAPI spec download failed for ${source}`,
-          why: `The server answered ${response.status}`,
+          why: "The server answered with a redirect, non-JSON body, or another fetch error",
           fix: "Check the source URL and the credentials pull.headers reads",
+          cause,
         });
       }
-
-      const path = resolvePath({ path: spec });
-      writeFileSync(path, `${JSON.stringify(await response.json(), null, 2)}\n`);
-
-      return path;
     },
   };
 }
