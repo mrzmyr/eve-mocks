@@ -33,7 +33,7 @@ Commands
 
 Run options, in the wrapped command or before --
   --mocks                 turn the mocks on; without it the command runs untouched
-  --no-fail-on-blocked    let a run pass although a call was blocked (default: exit 1)
+  --no-fail-on-block      let a run pass although a call was blocked (default: exit 1)
 
 Global options
   --dir <path>    mocks directory (default: mocks)
@@ -52,7 +52,7 @@ Output
 
 Run report
   Each run under --mocks writes .eve-mocks/report.json:
-    { command, startedAt, exitCode, counts: { mocked, allowed, blocked },
+    { command, startedAt, exitCode, counts: { mock, allow, block },
       targets: [{ outcome, target, calls, tools? }], log }
   tools counts MCP tools/call by tool name. log is the call log of that run, one
   JSON object per line. report.json is always the latest run; each run also keeps
@@ -61,13 +61,13 @@ Run report
 
 Exit codes
   0    success
-  1    the command failed, or a run made a blocked call; stderr says why and the fix
+  1    the command failed, or a run made a block; stderr says why and the fix
   2    wrong usage: unknown command, unknown option, or a missing argument
   127  the wrapped command could not start
   n    under \`--\`, otherwise the exit code of the wrapped command
 
 Examples
-  eve-mocks list --json | jq '.[] | select(.status == "blocked")'
+  eve-mocks list --json | jq '.[] | select(.status == "block")'
   eve-mocks add linear && eve-mocks pull linear --header "Authorization: Bearer $TOKEN"
   eve-mocks -- eve eval --mocks
 
@@ -94,12 +94,12 @@ Options
 
 Examples
   eve-mocks list
-  eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'`,
+  eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "block")] | length == 0'`,
 
   info: `eve-mocks info [--dir <path>] [--json]
 
 The setup eve-mocks sees: its version, the runtime, the mocks directory, eve's
-compiled manifest, and how many upstreams are mocked, allowed, and blocked.
+compiled manifest, and how many upstreams are mock, allow, and block.
 Nothing is changed. Exits 0 even when a part is missing; read \`problems\`.
 
 Options
@@ -118,7 +118,7 @@ connection works when its module constructs the URL while it loads; otherwise
 write the mock by hand.
 
 Examples
-  eve-mocks list          # find the names that are blocked
+  eve-mocks list          # find the names with status block
   eve-mocks add linear`,
 
   pull: `eve-mocks pull [name] [--dir <path>] [--header "Name: value"]...

@@ -32,22 +32,22 @@ const PRELOAD = new URL("./preload.ts", import.meta.url);
 const PROXIED_SCRIPTS = ["dev", "eval"];
 
 /**
- * Colour of each outcome, in `list` and in the run summary. `allowed` warns:
+ * Colour of each outcome, in `list` and in the run summary. `allow` warns:
  * it is the one outcome that reaches a real upstream.
  */
-const OUTCOME_COLORS = { mocked: "green", allowed: "yellow", blocked: "red" } as const;
+const OUTCOME_COLORS = { mock: "green", allow: "yellow", block: "red" } as const;
 
 /** Icon of each outcome, so `list` still reads without colour. */
-const OUTCOME_ICONS = { mocked: "✓", allowed: "→", blocked: "✗" } as const;
+const OUTCOME_ICONS = { mock: "✓", allow: "→", block: "✗" } as const;
 
 /** Label of each outcome as printed: the verb, so it reads as what the call does. */
-const OUTCOME_LABELS = { mocked: "mock", allowed: "allow", blocked: "block" } as const;
+const OUTCOME_LABELS = { mock: "mock", allow: "allow", block: "block" } as const;
 
 /** What each outcome means, for the legend below `list`. */
 const OUTCOME_LEGEND = {
-  mocked: "a mock answers",
-  allowed: "reaches the real upstream",
-  blocked: "the call throws",
+  mock: "a mock answers",
+  allow: "reaches the real upstream",
+  block: "the call throws",
 } as const;
 
 /**
@@ -98,11 +98,11 @@ function printReport({
   readonly notes: ReadonlyMap<string, string>;
 }): void {
   const stream = process.stderr;
-  const total = report.counts.mocked + report.counts.allowed + report.counts.blocked;
-  let headline = `${formatCount({ count: total, noun: "call" })}, none blocked`;
+  const total = report.counts.mock + report.counts.allow + report.counts.block;
+  let headline = `${formatCount({ count: total, noun: "call" })}, no block`;
 
-  if (report.counts.blocked > 0) {
-    headline = `${formatCount({ count: total, noun: "call" })}, ${report.counts.blocked} blocked`;
+  if (report.counts.block > 0) {
+    headline = `${formatCount({ count: total, noun: "call" })}, ${report.counts.block} block`;
   }
 
   if (total === 0) {
@@ -118,7 +118,7 @@ function printReport({
     0,
   );
 
-  for (const outcome of ["mocked", "allowed", "blocked"] as const) {
+  for (const outcome of ["mock", "allow", "block"] as const) {
     const rows = report.targets.filter((entry) => {
       return entry.outcome === outcome;
     });
@@ -185,7 +185,7 @@ async function findConnections({ hosts }: { readonly hosts: readonly string[] })
  * The error for a run that made blocked calls, with one fix per blocked host:
  * the commands for a host that is an eve connection, else the file to write.
  */
-function createBlockedError({
+function createBlockError({
   report,
   connections,
 }: {
@@ -194,7 +194,7 @@ function createBlockedError({
 }): MockError {
   const fixes = report.targets
     .filter(({ outcome }) => {
-      return outcome === "blocked";
+      return outcome === "block";
     })
     .flatMap(({ target, url }) => {
       const { protocol, host } = new URL(url);
@@ -210,9 +210,9 @@ function createBlockedError({
 
   return createError({
     status: 403,
-    message: `${formatCount({ count: report.counts.blocked, noun: "blocked call" })} failed the run`,
+    message: `${formatCount({ count: report.counts.block, noun: "block" })} failed the run`,
     why: "The command succeeded, but the agent called an upstream that is neither mocked nor allowed, and a model that recovers from the thrown error would hide that",
-    fix: [...fixes, `To let such a run pass, add ${ALLOW_BLOCKED_FLAG}`].join("\n       "),
+    fix: [...fixes, `To let such a run pass, add ${ALLOW_BLOCK_FLAG}`].join("\n       "),
   });
 }
 
@@ -231,7 +231,7 @@ async function checkMocks({ dir }: { readonly dir: string }): Promise<Awaited<Re
 const MOCKS_FLAG = "--mocks";
 
 /** Flag that lets a run with blocked calls succeed. `run` removes it before the command sees it. */
-const ALLOW_BLOCKED_FLAG = "--no-fail-on-blocked";
+const ALLOW_BLOCK_FLAG = "--no-fail-on-block";
 
 /**
  * Start the wrapped command. A command that cannot start, such as one that is
@@ -285,14 +285,14 @@ function start({
 async function run({
   dir,
   command,
-  shouldFailOnBlocked,
+  shouldFailOnBlock,
 }: {
   readonly dir: string;
   readonly command: readonly string[];
-  readonly shouldFailOnBlocked: boolean;
+  readonly shouldFailOnBlock: boolean;
 }): Promise<void> {
   const [file, ...args] = command.filter((arg) => {
-    return arg !== MOCKS_FLAG && arg !== ALLOW_BLOCKED_FLAG;
+    return arg !== MOCKS_FLAG && arg !== ALLOW_BLOCK_FLAG;
   });
 
   if (file === undefined) {
@@ -338,7 +338,7 @@ async function run({
     const exitCode = code ?? 1;
     const report = writeReport({ root, log, command: [file, ...args], startedAt, exitCode });
     const blocked = report.targets.filter(({ outcome }) => {
-      return outcome === "blocked";
+      return outcome === "block";
     });
     const connections = await findConnections({
       hosts: blocked.map(({ target }) => {
@@ -356,8 +356,8 @@ async function run({
       ]),
     });
 
-    if (exitCode === 0 && blocked.length > 0 && shouldFailOnBlocked && !command.includes(ALLOW_BLOCKED_FLAG)) {
-      console.error(`\neve-mocks: ${createBlockedError({ report, connections }).message}`);
+    if (exitCode === 0 && blocked.length > 0 && shouldFailOnBlock && !command.includes(ALLOW_BLOCK_FLAG)) {
+      console.error(`\neve-mocks: ${createBlockError({ report, connections }).message}`);
       process.exit(1);
     }
 
@@ -444,7 +444,7 @@ function printSections({ rows }: { readonly rows: readonly Coverage[] }): void {
     }),
   });
 
-  const legend = (["mocked", "allowed", "blocked"] as const).map((outcome) => {
+  const legend = (["mock", "allow", "block"] as const).map((outcome) => {
     return `${formatOutcome({ outcome, width: 0 })}: ${OUTCOME_LEGEND[outcome]}`;
   });
 
@@ -675,7 +675,7 @@ async function info({ dir, isJson }: { readonly dir: string; readonly isJson: bo
     ["manifest", `${manifest.path} (version ${manifest.version ?? "unknown"})`],
     [
       "connections",
-      (["mocked", "allowed", "blocked"] as const)
+      (["mock", "allow", "block"] as const)
         .map((outcome) => {
           return `${formatOutcome({ outcome, width: 0 })} ${counts[outcome]}`;
         })
@@ -787,14 +787,14 @@ function parse() {
   try {
     return parseArgs({
       allowPositionals: true,
-      // For --no-fail-on-blocked. See https://nodejs.org/api/util.html#utilparseargsconfig
+      // For --no-fail-on-block. See https://nodejs.org/api/util.html#utilparseargsconfig
       allowNegative: true,
       tokens: true,
       options: {
         dir: { type: "string", default: "mocks" },
         header: { type: "string", multiple: true, default: [] },
         json: { type: "boolean", default: false },
-        "fail-on-blocked": { type: "boolean", default: true },
+        "fail-on-block": { type: "boolean", default: true },
         help: { type: "boolean", short: "h", default: false },
         version: { type: "boolean", short: "v", default: false },
       },
@@ -838,7 +838,7 @@ try {
   } else if (values.help && !isWrapper) {
     help({ command: name });
   } else if (isWrapper) {
-    await run({ dir, command: positionals, shouldFailOnBlocked: values["fail-on-blocked"] });
+    await run({ dir, command: positionals, shouldFailOnBlock: values["fail-on-block"] });
   } else if (name === undefined) {
     help({ command: undefined });
   } else if (name === "help") {

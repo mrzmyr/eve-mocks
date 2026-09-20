@@ -131,7 +131,7 @@ describe("cli", () => {
 
     expect(status).toBe(0);
     expect(problems).toHaveLength(2);
-    expect(counts).toEqual({ mocked: 0, allowed: 0, blocked: 0 });
+    expect(counts).toEqual({ mock: 0, allow: 0, block: 0 });
   });
 
   test("leaves the flags after -- to the wrapped command and passes its exit code on", () => {
@@ -143,17 +143,17 @@ describe("cli", () => {
     expect(stdout).toBe("");
   });
 
-  test("fails a run whose command succeeded but made a blocked call", () => {
+  test("fails a run whose command succeeded but made a block", () => {
     const { status, stderr } = run({ args: ["--", "node", "agent.mjs", "--stray", "--mocks"], cwd: APP_ROOT });
 
     expect(status).toBe(1);
-    expect(stderr).toContain("1 blocked call failed the run");
+    expect(stderr).toContain("1 block failed the run");
     expect(stderr).toContain('allow({ url: "https://stray.example.com/" })');
   });
 
-  test("lets that run pass with --no-fail-on-blocked, in the command or before --", () => {
-    const inCommand = ["--", "node", "agent.mjs", "--stray", "--mocks", "--no-fail-on-blocked"];
-    const before = ["--no-fail-on-blocked", "--", "node", "agent.mjs", "--stray", "--mocks"];
+  test("lets that run pass with --no-fail-on-block, in the command or before --", () => {
+    const inCommand = ["--", "node", "agent.mjs", "--stray", "--mocks", "--no-fail-on-block"];
+    const before = ["--no-fail-on-block", "--", "node", "agent.mjs", "--stray", "--mocks"];
 
     expect(run({ args: inCommand, cwd: APP_ROOT }).status).toBe(0);
     expect(run({ args: before, cwd: APP_ROOT }).status).toBe(0);
@@ -164,9 +164,9 @@ describe("cli", () => {
 
     const report = JSON.parse(readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8"));
 
-    expect(report.counts).toEqual({ mocked: 1, allowed: 0, blocked: 0 });
+    expect(report.counts).toEqual({ mock: 1, allow: 0, block: 0 });
     expect(report.targets).toEqual([
-      { outcome: "mocked", target: "shop", calls: 1, url: "https://shop.example.com/mcp", tools: { get_order: 1 } },
+      { outcome: "mock", target: "shop", calls: 1, url: "https://shop.example.com/mcp", tools: { get_order: 1 } },
     ]);
     expect(readFileSync(join(APP_ROOT, ".eve-mocks/.gitignore"), "utf8")).toBe("*\n");
   });
@@ -195,22 +195,22 @@ describe("cli", () => {
   });
 
   for (const runtime of ["node", "bun"]) {
-    test(`blocks node:http, node:https, and node:http2 under ${runtime}, and counts them as blocked`, () => {
+    test(`blocks node:http, node:https, and node:http2 under ${runtime}, and counts them as block`, () => {
       const { status, stdout } = run({ args: ["--", runtime, "legacy.mjs", "--mocks"], cwd: APP_ROOT });
       const lines = stdout.trim().split("\n");
 
       expect(lines).toEqual([
-        "https-named-import BLOCKED eve-mocks blocked GET https://stray.example.com/x",
-        "http-options BLOCKED eve-mocks blocked POST http://stray.example.com/y",
-        "http2 BLOCKED eve-mocks blocked CONNECT https://stray.example.com/",
-        "mocked-host BLOCKED eve-mocks blocked GET https://shop.example.com/mcp",
+        "https-named-import BLOCKED eve-mocks block GET https://stray.example.com/x",
+        "http-options BLOCKED eve-mocks block POST http://stray.example.com/y",
+        "http2 BLOCKED eve-mocks block CONNECT https://stray.example.com/",
+        "mocked-host BLOCKED eve-mocks block GET https://shop.example.com/mcp",
         "loopback REACHED",
       ]);
       expect(status).toBe(1);
 
       const report = JSON.parse(readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8"));
 
-      expect(report.counts.blocked).toBe(4);
+      expect(report.counts.block).toBe(4);
     });
   }
 
@@ -218,7 +218,7 @@ describe("cli", () => {
     const { stdout } = run({ args: ["list", "--json"], cwd: APP_ROOT });
     const allowed = (JSON.parse(stdout) as { name: string; status: string }[])
       .filter(({ status }) => {
-        return status === "allowed";
+        return status === "allow";
       })
       .map(({ name }) => {
         return name;

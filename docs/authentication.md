@@ -4,7 +4,7 @@ You do not have to do anything. A connection signs in before it calls its
 upstream, and eve-mocks answers that sign-in itself:
 
 ```
-❅ eve-mocks  4 calls, none blocked
+❅ eve-mocks  4 calls, no block
 
   ✓ mock      sign-in     1   answered by default
               linear      3   get_issue 3

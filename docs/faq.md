@@ -54,7 +54,7 @@ tool without a result is one the model could not call.
 
 It is blocked, not mocked. eve-mocks answers `fetch` only. Requests through
 `node:http`, `node:https`, and `node:http2` throw unless their URL is allowed,
-and they count as `blocked`. Call the upstream with `fetch` to mock it.
+and they count as `block`. Call the upstream with `fetch` to mock it.
 
 ### `list` shows a dynamic connection without a URL. What now?
 

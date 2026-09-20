@@ -72,7 +72,7 @@ function getEveVersion({ root }: { readonly root: string }): string | undefined 
  */
 export async function getInfo({ root, dir }: { readonly root: string; readonly dir: string }): Promise<Info> {
   const problems: string[] = [];
-  const counts: Record<CoverageStatus, number> = { mocked: 0, allowed: 0, blocked: 0 };
+  const counts: Record<CoverageStatus, number> = { mock: 0, allow: 0, block: 0 };
   let loaded: Awaited<ReturnType<typeof loadMocks>> = { mocks: [], allowed: [] };
 
   /** Record an operator error as a problem; anything else is a defect and surfaces. */

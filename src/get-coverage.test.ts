@@ -18,7 +18,7 @@ describe("getCoverage", () => {
     });
 
     expect(rows).toEqual([
-      { name: "logs", status: "mocked", url: "https://logs.example.com/mcp", type: "mcp", isConnection: true, isDynamic: true },
+      { name: "logs", status: "mock", url: "https://logs.example.com/mcp", type: "mcp", isConnection: true, isDynamic: true },
     ]);
   });
 
@@ -29,16 +29,16 @@ describe("getCoverage", () => {
       allowed: [],
     });
 
-    expect(row?.status).toBe("blocked");
+    expect(row?.status).toBe("block");
   });
 
   test("falls back to the mock name for a dynamic connection without a URL", () => {
     const connections = [{ name: "tenant-api", path: "/app/connections/tenant-api.ts" }];
 
-    expect(getCoverage({ connections, mocks: [], allowed: [] })[0]?.status).toBe("blocked");
+    expect(getCoverage({ connections, mocks: [], allowed: [] })[0]?.status).toBe("block");
     expect(
       getCoverage({ connections, mocks: [createMock({ name: "tenant-api", url: "https://t.example.com" })], allowed: [] })[0]?.status,
-    ).toBe("mocked");
+    ).toBe("mock");
   });
 
   test("lets a mock win over an allow entry, and lists an allow entry no connection uses", () => {
@@ -60,10 +60,10 @@ describe("getCoverage", () => {
         return { name, status, type, isConnection };
       }),
     ).toEqual([
-      { name: "linear", status: "mocked", type: "mcp", isConnection: true },
-      { name: "mcp.linear.app", status: "allowed", type: undefined, isConnection: false },
-      { name: "model-gateway", status: "allowed", type: undefined, isConnection: false },
-      { name: "reports", status: "allowed", type: "http", isConnection: true },
+      { name: "linear", status: "mock", type: "mcp", isConnection: true },
+      { name: "mcp.linear.app", status: "allow", type: undefined, isConnection: false },
+      { name: "model-gateway", status: "allow", type: undefined, isConnection: false },
+      { name: "reports", status: "allow", type: "http", isConnection: true },
     ]);
   });
 });

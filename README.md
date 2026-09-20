@@ -14,9 +14,9 @@ Set up eve-mocks in this eve app and mock its first upstream.
 
 1. Run `bunx eve-mocks --help` and read it. It documents every command, JSON shape, and exit code.
 2. Run `bunx eve-mocks init`, then `bunx eve info`, then `bunx eve-mocks list --json`.
-3. Pick one connection with status "blocked" that the evals use. Run `bunx eve-mocks add NAME` and `bunx eve-mocks pull NAME`. If pull needs a sign-in or a token, stop and ask me.
+3. Pick one connection with status "block" that the evals use. Run `bunx eve-mocks add NAME` and `bunx eve-mocks pull NAME`. If pull needs a sign-in or a token, stop and ask me.
 4. In mocks/NAME.ts, pin only what the evals assert on: one result per MCP tool, or routes for an HTTP upstream.
-5. Run the evals with --mocks until the summary has no blocked line. Never allow() an upstream without asking me; the model gateway is the usual exception.
+5. Run the evals with --mocks until the summary has no block line. Never allow() an upstream without asking me; the model gateway is the usual exception.
 6. Show me the final summary and the files you created.
 
 Docs for agents: https://eve-mocks.vercel.app/llms.txt
@@ -53,11 +53,11 @@ bunx eve-mocks list
 
 ```
 eve connections
-  linear                  ✗ blocked   MCP   https://mcp.linear.app/mcp
-  notion                  ✗ blocked   HTTP  https://api.notion.com/
+  linear                  ✗ block     MCP   https://mcp.linear.app/mcp
+  notion                  ✗ block     HTTP  https://api.notion.com/
 ```
 
-Every connection starts `blocked`: under `--mocks` a call to it throws. Pick one.
+Every connection starts `block`: under `--mocks` a call to it throws. Pick one.
 
 ### 3. Add Mock
 
@@ -134,15 +134,15 @@ bun run eval --mocks
 ```
 
 ```
-❅ eve-mocks  5 calls, 2 blocked
+❅ eve-mocks  5 calls, 2 block
 
-  ✓ mocked    linear             3   get_issue 3
-  ✗ blocked   api.notion.com     2   connection "notion"
+  ✓ mock      linear             3   get_issue 3
+  ✗ block     api.notion.com     2   connection "notion"
 
   report      .eve-mocks/report.json
 ```
 
-Linear was answered in-process. Notion was blocked, and a blocked call fails
+Linear was answered in-process. Notion was a block, and a block fails
 the run with exit 1. Mock it too by repeating steps 3 to 5, or
 [allow](docs/allow.md) it when the eval needs the real thing:
 
@@ -153,13 +153,13 @@ import { allow } from "eve-mocks";
 export default allow({ url: "https://api.notion.com/" });
 ```
 
-A green run has no `blocked` row. Commit `mocks/`:
+A green run has no `block` row. Commit `mocks/`:
 
 ```
-❅ eve-mocks  5 calls, none blocked
+❅ eve-mocks  5 calls, no block
 
-  ✓ mocked    linear     3   get_issue 3
-  → allowed   notion     2
+  ✓ mock      linear     3   get_issue 3
+  → allow     notion     2
 
   report      .eve-mocks/report.json
 ```
@@ -170,7 +170,7 @@ A green run has no `blocked` row. Commit `mocks/`:
 
 - **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and protected upstreams.
 - **[Authentication](docs/authentication.md)**: sign-ins are answered for you, and the one exception.
-- **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
+- **[Allow](docs/allow.md)**: let a real upstream through, and what a block does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
 - **[FAQ](docs/faq.md)**: several specs on one host, local spec files, and clients that do not use `fetch`.
 - **[Run in CI](docs/ci.md)**: the workflow, secrets, the coverage gate, and the run report.

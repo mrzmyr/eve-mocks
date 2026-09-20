@@ -153,7 +153,7 @@ function toAnsi({ markdown }: { readonly markdown: string }): string {
       continue;
     }
 
-    const isOutput = fence.opener === "```" && /✓ mocked|→ allowed|✗ blocked|^(❅ )?eve-mocks/m.test(fence.body.join("\n"));
+    const isOutput = fence.opener === "```" && /✓ mock|→ allow|✗ block|^(❅ )?eve-mocks/m.test(fence.body.join("\n"));
 
     if (isOutput) {
       out.push('```ansi title="Terminal"', ...fence.body.map((row) => paintLine({ line: row })), "```");
@@ -194,9 +194,9 @@ function paintLine({ line }: { readonly line: string }): string {
       .replace(/^(eve-mocks:)/, (_m, prefix: string) => {
         return paint({ text: prefix, code: 31 });
       })
-      .replaceAll("✓ mocked", paint({ text: "✓ mocked", code: 32 }))
-      .replaceAll("→ allowed", paint({ text: "→ allowed", code: 33 }))
-      .replaceAll("✗ blocked", paint({ text: "✗ blocked", code: 31 }))
+      .replaceAll("✓ mock", paint({ text: "✓ mock", code: 32 }))
+      .replaceAll("→ allow", paint({ text: "→ allow", code: 33 }))
+      .replaceAll("✗ block", paint({ text: "✗ block", code: 31 }))
   );
 }
 

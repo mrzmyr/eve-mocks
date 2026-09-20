@@ -4,7 +4,7 @@ import type { CallRecord, UpstreamType } from "./types.ts";
 
 /**
  * What a call to the upstream does under `--mocks`, in the words the run
- * summary uses. `blocked` includes a dynamic connection whose URL is unknown:
+ * summary uses. `block` includes a dynamic connection whose URL is unknown:
  * deny by default does not need the URL.
  */
 export type CoverageStatus = CallRecord["outcome"];
@@ -83,14 +83,14 @@ export function getCoverage({
 
     if (url === undefined) {
       if (hit) {
-        return { ...base, status: "mocked", url: hit.mock.url };
+        return { ...base, status: "mock", url: hit.mock.url };
       }
 
-      return { ...base, status: "blocked" };
+      return { ...base, status: "block" };
     }
 
     if (hit) {
-      return { ...base, status: "mocked", url };
+      return { ...base, status: "mock", url };
     }
 
     const passes = allowed.filter(({ entry }) => {
@@ -102,17 +102,17 @@ export function getCoverage({
     }
 
     if (passes.length > 0) {
-      return { ...base, status: "allowed", url };
+      return { ...base, status: "allow", url };
     }
 
-    return { ...base, status: "blocked", url };
+    return { ...base, status: "block", url };
   });
 
   for (const entry of mocks) {
     if (!matched.has(entry)) {
       rows.push({
         name: entry.name,
-        status: "mocked",
+        status: "mock",
         url: entry.mock.url,
         type: entry.mock.type,
         isConnection: false,
@@ -123,7 +123,7 @@ export function getCoverage({
 
   for (const entry of allowed) {
     if (!matched.has(entry)) {
-      rows.push({ name: entry.name, status: "allowed", url: entry.entry.url, isConnection: false, isDynamic: false });
+      rows.push({ name: entry.name, status: "allow", url: entry.entry.url, isConnection: false, isDynamic: false });
     }
   }
 

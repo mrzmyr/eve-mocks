@@ -1,6 +1,6 @@
 # Allow
 
-Under `--mocks` a request is mocked, allowed, or blocked. `allow()` lets one
+Under `--mocks` a call has one outcome: mock, allow, or block. `allow()` lets one
 upstream through to the real thing, for the few an eval cannot do without, such
 as the model.
 
@@ -18,24 +18,24 @@ everything that can reach production.
 
 `url` is a prefix. Keep it as narrow as the eval allows: a path, not a host.
 
-## Blocked
+## Block
 
 Everything else throws inside the agent, with the line to paste:
 
 ```
-eve-mocks blocked GET https://logs.example.com/mcp
+eve-mocks block GET https://logs.example.com/mcp
   why: Under --mocks a request must be mocked or allowed, and logs.example.com is neither
   fix: Mock it: eve-mocks add <connection>, or write mocks/<name>.ts
        Or allow it in mocks/<name>.ts: export default allow({ url: "https://logs.example.com/" })
 ```
 
 The run summary collects them, names the eve connection a host belongs to, and
-one blocked call fails the run with exit 1, even when every eval passed. A
+one block fails the run with exit 1, even when every eval passed. A
 model that recovers from the thrown error would otherwise hide that the agent
 reached for an upstream nobody decided on.
 
 ```
-❅ eve-mocks  31 calls, 1 blocked
+❅ eve-mocks  31 calls, 1 block
 
   ✓ mock      linear              10   get_issue 6, list_teams 4
               notion               6
@@ -44,7 +44,7 @@ reached for an upstream nobody decided on.
 
   report      .eve-mocks/report.json
 
-eve-mocks: 1 blocked call failed the run
+eve-mocks: 1 block failed the run
   fix: logs.example.com: mock it with eve-mocks add logs && eve-mocks pull logs
          or allow it in mocks/<name>.ts: export default allow({ url: "https://logs.example.com/" })
 ```
@@ -52,7 +52,7 @@ eve-mocks: 1 blocked call failed the run
 To let such a run pass anyway:
 
 ```sh
-bun run eval --mocks --no-fail-on-blocked
+bun run eval --mocks --no-fail-on-block
 ```
 
 ## What passes without an entry

@@ -63,11 +63,11 @@ guardNodeHttp({
     });
 
     if (pass) {
-      logCall({ outcome: "allowed", target: pass.name, method, url });
+      logCall({ outcome: "allow", target: pass.name, method, url });
       return;
     }
 
-    logCall({ outcome: "blocked", target: host, method, url });
+    logCall({ outcome: "block", target: host, method, url });
 
     const match = mocks.find(({ mock }) => {
       return url.startsWith(mock.url);
@@ -80,7 +80,7 @@ guardNodeHttp({
 
     throw createError({
       status: 403,
-      message: `eve-mocks blocked ${method} ${url}`,
+      message: `eve-mocks block ${method} ${url}`,
       why: `Under --mocks a request must be mocked or allowed, and ${host} is neither. It went through ${module}, which eve-mocks blocks but cannot answer`,
       fix,
     });
@@ -153,7 +153,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     const tool = await readTool({ request });
 
-    logCall({ outcome: "mocked", target: match.name, method, url, ...(tool !== undefined && { tool }) });
+    logCall({ outcome: "mock", target: match.name, method, url, ...(tool !== undefined && { tool }) });
     return match.mock.handle(request, { name: match.name });
   }
 
@@ -169,7 +169,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   });
 
   if (pass) {
-    logCall({ outcome: "allowed", target: pass.name, method, url });
+    logCall({ outcome: "allow", target: pass.name, method, url });
     return realFetch(input, init);
   }
 
@@ -180,7 +180,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     });
 
     if (document) {
-      logCall({ outcome: "mocked", target: name, method, url });
+      logCall({ outcome: "mock", target: name, method, url });
       return new Response(readFileSync(document.path), { headers: { "content-type": "application/json" } });
     }
   }
@@ -191,15 +191,15 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const signIn = await getSignIn({ request });
 
   if (signIn) {
-    logCall({ outcome: "mocked", target: SIGN_IN, method, url });
+    logCall({ outcome: "mock", target: SIGN_IN, method, url });
     return signIn.handle(request, { name: SIGN_IN });
   }
 
-  logCall({ outcome: "blocked", target: host, method, url });
+  logCall({ outcome: "block", target: host, method, url });
 
   throw createError({
     status: 403,
-    message: `eve-mocks blocked ${method} ${url}`,
+    message: `eve-mocks block ${method} ${url}`,
     why: `Under --mocks a request must be mocked or allowed, and ${host} is neither`,
     fix: `Mock it: eve-mocks add <connection>, or write mocks/<name>.ts\n       Or allow it in mocks/<name>.ts: export default allow({ url: "${protocol}//${host}/" })`,
   });

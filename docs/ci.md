@@ -30,7 +30,7 @@ called an upstream that is neither mocked nor allowed. Without that, a model
 that recovers from the thrown error hides it, and the eval passes anyway. The
 summary names each blocked host and the fix.
 
-Opt out with `--no-fail-on-blocked`, in the wrapped command or before `--`.
+Opt out with `--no-fail-on-block`, in the wrapped command or before `--`.
 
 ### Which secrets does CI need?
 
@@ -48,8 +48,8 @@ workflow above uploads it as an artifact.
 {
   "command": ["eve", "eval"],
   "exitCode": 0,
-  "counts": { "mocked": 18, "allowed": 14, "blocked": 0 },
-  "targets": [{ "outcome": "mocked", "target": "linear", "calls": 10, "tools": { "get_issue": 4 } }],
+  "counts": { "mock": 18, "allow": 14, "block": 0 },
+  "targets": [{ "outcome": "mock", "target": "linear", "calls": 10, "tools": { "get_issue": 4 } }],
   "log": ".eve-mocks/runs/2026-09-20T18-22-31-114Z-4821.jsonl"
 }
 ```
@@ -66,7 +66,7 @@ nobody has mocked, before any eval runs:
 
 ```yaml
 - run: bunx eve info
-- run: bunx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'
+- run: bunx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "block")] | length == 0'
 ```
 
 ### Why is there no colour in the CI log?

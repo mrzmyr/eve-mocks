@@ -90,10 +90,10 @@ export type ToolResult = (args: Record<string, unknown>) => unknown;
 /** One intercepted call, as the preload appends it to the call log. */
 export type CallRecord = {
   /**
-   * `mocked`: a mock answered. `allowed`: sent to the real upstream.
-   * `blocked`: neither mocked nor allowed, so the call threw.
+   * `mock`: a mock answered. `allow`: sent to the real upstream.
+   * `block`: neither mocked nor allowed, so the call threw.
    */
-  readonly outcome: "mocked" | "allowed" | "blocked";
+  readonly outcome: "mock" | "allow" | "block";
   /** Name of the mock or allow entry that matched, else the host that was called. */
   readonly target: string;
   /** Tool an MCP `tools/call` named. Absent for every other request. */

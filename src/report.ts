@@ -11,7 +11,7 @@ const KEPT_RUNS = 10;
 
 /** Calls to one target with one outcome. */
 export type TargetCount = {
-  /** `mocked`, `allowed`, or `blocked`. */
+  /** `mock`, `allow`, or `block`. */
   readonly outcome: CallRecord["outcome"];
   /** Name of the mock or allow entry that matched, else the host that was called. */
   readonly target: string;
@@ -117,7 +117,7 @@ export function writeReport({
   readonly startedAt: Date;
   readonly exitCode: number;
 }): Report {
-  const counts = { mocked: 0, allowed: 0, blocked: 0 };
+  const counts = { mock: 0, allow: 0, block: 0 };
   const byTarget = new Map<
     string,
     { outcome: CallRecord["outcome"]; target: string; calls: number; url: string; tools: Record<string, number> }

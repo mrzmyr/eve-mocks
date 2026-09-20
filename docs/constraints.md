@@ -8,7 +8,7 @@ limit below follows from that.
 
 `node:http`, `node:https`, and `node:http2` are blocked, not mocked. A client
 built on them, such as axios, got, or a gRPC-based SDK, throws unless its URL is
-allowed, and counts as `blocked`. Call the upstream with `fetch` to mock it.
+allowed, and counts as `block`. Call the upstream with `fetch` to mock it.
 eve's own connections all use `fetch`.
 
 Raw `node:net` and `node:tls` sockets and the `undici` package used directly
