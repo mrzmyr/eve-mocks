@@ -4,17 +4,6 @@ eve-mocks works by loading a preload into every process the wrapped command
 spawns. The preload patches global `fetch` and guards Node's HTTP modules. Each
 limit below follows from that.
 
-## Not published yet
-
-Node refuses to strip types under `node_modules`, so the package needs a
-JavaScript build before it can ship to npm. Until then, link it from a clone.
-The symlink resolves to the source, which works:
-
-```sh
-git clone https://github.com/mrzmyr/eve-mocks && cd eve-mocks && bun install && bun link
-cd ../my-agent && bun link eve-mocks
-```
-
 ## Only `fetch` is mocked
 
 `node:http`, `node:https`, and `node:http2` are blocked, not mocked. A client

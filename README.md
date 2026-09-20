@@ -44,9 +44,6 @@ APIs.
 "eval": "eve-mocks -- eve eval"
 ```
 
-Until the package is on npm, link it from a clone instead: see
-[Constraints](docs/constraints.md#not-published-yet).
-
 ### 2. List Mocks
 
 ```sh
