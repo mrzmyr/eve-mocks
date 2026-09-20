@@ -63,7 +63,7 @@ const PAGES: readonly Page[] = [
     slug: "faq",
     group: "Reference",
     title: "FAQ",
-    description: "Advanced usage: several specs on one host, local spec files, dynamic connections, and more.",
+    description: "The six cases the basics do not cover.",
   },
   {
     source: "docs/ci.md",

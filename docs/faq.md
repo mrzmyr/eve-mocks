@@ -44,18 +44,17 @@ defineHttpMock({
 });
 ```
 
-### Where do pulled schema files go?
-
-Into `mocks/schemas/`, named after the mock file: `mocks/notion.ts` reads
-`notion.openapi.json`, and `mocks/linear.ts` reads `linear.tools.json`. A URL
-inside a `spec` array is numbered by its position, such as
-`shop.2.openapi.json` for the second entry.
-
 ### Why is a tool missing from the mocked server?
 
 The mock lists exactly the tools that have a result. Add a result for the tool
 and it appears. eve filters tools by the connection's allow-list anyway, so a
 tool without a result is one the model could not call.
+
+### My client uses axios, got, or a gRPC SDK. Is it mocked?
+
+It is blocked, not mocked. eve-mocks answers `fetch` only. Requests through
+`node:http`, `node:https`, and `node:http2` throw unless their URL is allowed,
+and they count as `blocked`. Call the upstream with `fetch` to mock it.
 
 ### `list` shows a dynamic connection without a URL. What now?
 
@@ -64,48 +63,5 @@ nothing to read before a session. `add` cannot scaffold it; write
 `mocks/<connection-name>.ts` by hand. The file name must equal the connection
 name, because that is how it is matched. Calls to it are blocked either way.
 More: [dynamic connections](constraints.md#dynamic-connections-built-per-session).
-
-### My client uses axios, got, or a gRPC SDK. Is it mocked?
-
-It is blocked, not mocked. eve-mocks answers `fetch` only. Requests through
-`node:http`, `node:https`, and `node:http2` throw unless their URL is allowed,
-and they count as `blocked`. Call the upstream with `fetch` to mock it.
-
-### Is code that runs in the eve sandbox mocked?
-
-No. The sandbox is another machine or a container, which the preload does not
-reach. What it may call is decided by the sandbox's own network policy.
-
-### Can I run `pull` in CI?
-
-You should not need to. `pull` runs on your machine, and the schemas are
-committed. CI reads them from the repository and needs neither the upstreams
-nor their credentials. See [Run in CI](ci.md).
-
-### Does it work with npm, pnpm, or yarn?
-
-Yes. Only the flag differs: `npm run eval -- --mocks` needs the `--`, `bun run
-eval --mocks` does not. The CLI always runs on Node, because its shebang asks
-for it; the command it wraps may run on Node or Bun.
-
-### Can one file allow several upstreams?
-
-Yes, default-export an array. Entries that share a file cannot share its name,
-so `list` and the run summary name each by its host. One file per upstream
-reads better.
-
-```ts
-export default [allow({ url: "https://a.example.com/" }), allow({ url: "https://b.example.com/" })];
-```
-
-### Can one run use a different set of mocks?
-
-Yes, point `--dir` at another folder: `eve-mocks --dir mocks/outage -- eve eval
---mocks`. Mocks are per run, not per eval.
-
-### Is it on npm?
-
-Not yet. Until then, link it from a clone with `bun link`. See
-[Constraints](constraints.md#not-published-yet).
 
 <!-- /site:accordion -->

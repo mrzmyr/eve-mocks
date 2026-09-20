@@ -59,6 +59,8 @@ lines without `--json`.
 - **Flags after `--` belong to the wrapped command.** eve-mocks never reads them.
 - **A mistyped command names the nearest one**: `eve-mocks lst` answers `Did you
   mean "list"?`.
+- **npm, pnpm, and yarn work like bun.** Only the flag differs: `npm run eval --
+  --mocks` needs the `--`, `bun run eval --mocks` does not.
 - **The CLI runs on Node**, whichever package manager starts it, because that is
   what its shebang asks for. The command it wraps may run on Node or Bun.
 

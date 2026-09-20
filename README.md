@@ -179,7 +179,7 @@ eve-mocks  25 calls, none blocked
 - **[Authentication](docs/authentication.md)**: what to do when a connection's sign-in is blocked.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
-- **[FAQ](docs/faq.md)**: several specs on one host, local spec files, dynamic connections, and more.
+- **[FAQ](docs/faq.md)**: several specs on one host, local spec files, and clients that do not use `fetch`.
 - **[Run in CI](docs/ci.md)**: the workflow, secrets, the coverage gate, and the run report.
 - **[Constraints](docs/constraints.md)**: what is not mocked, and why.
 - **[Example app](example)**: a tiny app with mocks, run under Node and Bun.
