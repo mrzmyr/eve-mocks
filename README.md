@@ -15,7 +15,7 @@ Set up eve-mocks in this eve app and mock its first upstream.
 1. Run `bunx eve-mocks --help` and read it. It documents every command, JSON shape, and exit code.
 2. Run `bunx eve-mocks init`, then `bunx eve info`, then `bunx eve-mocks list --json`.
 3. Pick one connection with status "blocked" that the evals use. Run `bunx eve-mocks add NAME` and `bunx eve-mocks pull NAME`. If pull needs a sign-in or a token, stop and ask me.
-4. In mocks/NAME.ts, pin only what the evals assert on: one result per MCP tool, or routes for a HTTP upstream.
+4. In mocks/NAME.ts, pin only what the evals assert on: one result per MCP tool, or routes for an HTTP upstream.
 5. Run the evals with --mocks until the summary has no blocked line. Never allow() an upstream without asking me; the model gateway is the usual exception.
 6. Show me the final summary and the files you created.
 
@@ -168,7 +168,7 @@ eve-mocks  5 calls, none blocked
 
 ## Next Steps
 
-- **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, protected upstreams, and the checks before a run.
+- **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and protected upstreams.
 - **[Authentication](docs/authentication.md)**: what to do when a connection's sign-in is blocked.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
