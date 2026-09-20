@@ -20,9 +20,10 @@ const OFFLINE_OIDC_TOKEN = [
  */
 export function vercelConnect(): Mock {
   return {
-    // A prefix, not a route: connector ids such as `tracker.example.com/tracker`
+    // A prefix, not a route: connector ids such as `mcp.linear.app/linear`
     // follow it and contain slashes.
     url: "https://api.vercel.com/v1/connect/token/",
+    type: "http",
     env: { VERCEL_OIDC_TOKEN: OFFLINE_OIDC_TOKEN },
     handle: async () => {
       return Response.json({

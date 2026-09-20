@@ -46,14 +46,39 @@ const OUTCOME_LEGEND = {
   blocked: "the call throws",
 } as const;
 
-/** An outcome with its icon, coloured. Padded first: escape codes would count towards the width. */
-function formatOutcome({ outcome, width }: { readonly outcome: CallRecord["outcome"]; readonly width: number }): string {
-  return styleText(OUTCOME_COLORS[outcome], `${OUTCOME_ICONS[outcome]} ${outcome}`.padEnd(width));
+/**
+ * An outcome with its icon, coloured. Padded first: escape codes would count
+ * towards the width. `stream` is where it is printed, so the colour follows
+ * that stream's terminal, not stdout's.
+ */
+function formatOutcome({
+  outcome,
+  width,
+  stream = process.stdout,
+}: {
+  readonly outcome: CallRecord["outcome"];
+  readonly width: number;
+  readonly stream?: NodeJS.WriteStream;
+}): string {
+  // styleText drops the colour for NO_COLOR and for a stream that is not a TTY.
+  // See https://nodejs.org/api/util.html#utilstyletextformat-text-options
+  return styleText(OUTCOME_COLORS[outcome], `${OUTCOME_ICONS[outcome]} ${outcome}`.padEnd(width), { stream });
 }
 
-/** Print what was mocked, what went to a real upstream, and what was blocked. */
+/** Label of each upstream type in `list`. */
+const TYPE_LABELS = { mcp: "MCP", http: "HTTP" } as const;
+
+/**
+ * Print what was mocked, what went to a real upstream, and what was blocked.
+ *
+ * One titled block on stderr, in the icons and colours of `list`. The title
+ * tells the block apart from the wrapped command's own output, so its rows
+ * need no prefix.
+ */
 function printReport({ report }: { readonly report: Report }): void {
-  console.error("");
+  const stream = process.stderr;
+
+  console.error(`\n${styleText("bold", "eve-mocks", { stream })}`);
 
   for (const outcome of ["mocked", "allowed", "blocked"] as const) {
     const counts = report.targets
@@ -66,17 +91,15 @@ function printReport({ report }: { readonly report: Report }): void {
       .join(", ");
 
     if (counts !== "") {
-      // styleText drops the colour for NO_COLOR and for a stream that is not a TTY.
-      // See https://nodejs.org/api/util.html#utilstyletextformat-text-options
-      console.error(`eve-mocks: ${styleText(OUTCOME_COLORS[outcome], outcome, { stream: process.stderr })}: ${counts}`);
+      console.error(`  ${formatOutcome({ outcome, width: 12, stream })}${counts}`);
     }
   }
 
   if (report.targets.length === 0) {
-    console.error("eve-mocks: no upstream call was made");
+    console.error("  no upstream call was made");
   }
 
-  console.error(`eve-mocks: report: ${join(STATE_DIR, "report.json")}`);
+  console.error(styleText("dim", `  ${"report".padEnd(12)}${join(STATE_DIR, "report.json")}`, { stream }));
 }
 
 /** Load the mocks and run each one's `check` against its schema file. */
@@ -227,14 +250,20 @@ function printRows({ title, rows }: { readonly title: string; readonly rows: rea
 
   console.log(styleText("bold", title));
 
-  for (const { name, status, url, isDynamic } of rows) {
+  for (const { name, status, url, type, isDynamic } of rows) {
     let target = url ?? "dynamic connection, its module constructs no URL before a session starts";
 
     if (isDynamic && url !== undefined) {
       target = `${target}${styleText("dim", " (dynamic)")}`;
     }
 
-    console.log(`  ${name.padEnd(24)}${formatOutcome({ outcome: status, width: 12 })}${target}`);
+    let label = "-";
+
+    if (type !== undefined) {
+      label = TYPE_LABELS[type];
+    }
+
+    console.log(`  ${name.padEnd(24)}${formatOutcome({ outcome: status, width: 12 })}${styleText("dim", label.padEnd(6))}${target}`);
   }
 
   console.log("");
@@ -503,6 +532,12 @@ function init({ dir }: { readonly dir: string }): void {
 
     scripts[name] = `eve-mocks -- ${script}`;
     console.log(`script ${name} now accepts ${MOCKS_FLAG}`);
+  }
+
+  // `bun run mocks list` reads better than `bunx eve-mocks list`, and pins the local version.
+  if (scripts.mocks === undefined) {
+    scripts.mocks = "eve-mocks";
+    console.log("script mocks added: bun run mocks list");
   }
 
   manifest.scripts = scripts;

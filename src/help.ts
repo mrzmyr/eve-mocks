@@ -58,7 +58,7 @@ Exit codes
 
 Examples
   eve-mocks list --json | jq '.[] | select(.status == "blocked")'
-  eve-mocks add tracker && eve-mocks pull tracker --header "Authorization: Bearer $TOKEN"
+  eve-mocks add linear && eve-mocks pull linear --header "Authorization: Bearer $TOKEN"
   eve-mocks -- eve eval --mocks
 
 Run eve-mocks help <command> for the details of one command.`;
@@ -78,8 +78,9 @@ from eve's compiled manifest; run \`eve info\` once when it is missing.
 
 Options
   --json   one JSON array on stdout, each row:
-           { name, status, url?, isConnection, isDynamic }
+           { name, status, url?, type?, isConnection, isDynamic }
            url is absent for a dynamic connection whose URL could not be read
+           type is "mcp" or "http"; absent for an allow entry
 
 Examples
   eve-mocks list
@@ -108,7 +109,7 @@ write the mock by hand.
 
 Examples
   eve-mocks list          # find the names that are blocked
-  eve-mocks add tracker`,
+  eve-mocks add linear`,
 
   pull: `eve-mocks pull [name] [--dir <path>] [--header "Name: value"]...
 
@@ -123,13 +124,13 @@ Options
 
 Examples
   eve-mocks pull
-  eve-mocks pull tracker --header "Authorization: Bearer $TRACKER_TOKEN"`,
+  eve-mocks pull linear --header "Authorization: Bearer $LINEAR_TOKEN"`,
 
   init: `eve-mocks init [--dir <path>]
 
-Create the mocks directory and route the app's \`dev\` and \`eval\` scripts in
-package.json through \`eve-mocks --\`. Safe to rerun: existing files and already
-wrapped scripts are left alone.
+Create the mocks directory, route the app's \`dev\` and \`eval\` scripts in
+package.json through \`eve-mocks --\`, and add a \`mocks\` script for this CLI.
+Safe to rerun: existing files and scripts are left alone.
 
 Examples
   eve-mocks init

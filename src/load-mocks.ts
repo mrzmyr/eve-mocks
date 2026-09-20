@@ -7,7 +7,7 @@ import type { Allowed, Mock } from "./types.ts";
 
 /** A mock with the name of the file that defines it. */
 export type NamedMock = {
-  /** File name without extension, such as `tracker`. */
+  /** File name without extension, such as `linear`. */
   readonly name: string;
   /** The mock the file default-exports. */
   readonly mock: Mock;

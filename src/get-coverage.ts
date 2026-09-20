@@ -1,6 +1,6 @@
 import type { NamedMock } from "./load-mocks.ts";
 import type { Connection } from "./read-manifest.ts";
-import type { Allowed, CallRecord } from "./types.ts";
+import type { Allowed, CallRecord, UpstreamType } from "./types.ts";
 
 /**
  * What a call to the upstream does under `--mocks`, in the words the run
@@ -17,6 +17,12 @@ export type Coverage = {
   readonly status: CoverageStatus;
   /** Production URL, when known. */
   readonly url?: string;
+  /**
+   * What the upstream speaks. From the connection's protocol, else from the mock
+   * that answers it; absent for an allow entry and for a dynamic connection
+   * that has neither.
+   */
+  readonly type?: UpstreamType;
   /** False for a mock or allow entry that matches no eve connection, such as a token endpoint. */
   readonly isConnection: boolean;
   /** True for a dynamic connection, which eve registers when a session starts. */
@@ -46,7 +52,7 @@ export function getCoverage({
 }): Coverage[] {
   const matched = new Set<NamedMock | Allowed>();
 
-  const rows = connections.map(({ name, url, path }): Coverage => {
+  const rows = connections.map(({ name, url, path, protocol }): Coverage => {
     const isDynamic = path !== undefined;
     const hits = mocks.filter(({ name: mockName, mock }) => {
       if (url === undefined) {
@@ -60,18 +66,31 @@ export function getCoverage({
       matched.add(hit);
     }
 
-    if (url === undefined) {
-      const [hit] = hits;
+    const [hit] = hits;
+    // The manifest says `openapi` for every HTTP API; a mock knows its own type.
+    let type = hit?.mock.type;
 
-      if (hit) {
-        return { name, status: "mocked", url: hit.mock.url, isConnection: true, isDynamic };
+    if (protocol !== undefined) {
+      type = "http";
+
+      if (protocol === "mcp") {
+        type = "mcp";
       }
-
-      return { name, status: "blocked", isConnection: true, isDynamic };
     }
 
-    if (hits.length > 0) {
-      return { name, status: "mocked", url, isConnection: true, isDynamic };
+    // Spread, not assigned: `exactOptionalPropertyTypes` rejects an explicit undefined.
+    const base = { name, isConnection: true, isDynamic, ...(type !== undefined && { type }) };
+
+    if (url === undefined) {
+      if (hit) {
+        return { ...base, status: "mocked", url: hit.mock.url };
+      }
+
+      return { ...base, status: "blocked" };
+    }
+
+    if (hit) {
+      return { ...base, status: "mocked", url };
     }
 
     const passes = allowed.filter((entry) => {
@@ -83,15 +102,22 @@ export function getCoverage({
     }
 
     if (passes.length > 0) {
-      return { name, status: "allowed", url, isConnection: true, isDynamic };
+      return { ...base, status: "allowed", url };
     }
 
-    return { name, status: "blocked", url, isConnection: true, isDynamic };
+    return { ...base, status: "blocked", url };
   });
 
   for (const entry of mocks) {
     if (!matched.has(entry)) {
-      rows.push({ name: entry.name, status: "mocked", url: entry.mock.url, isConnection: false, isDynamic: false });
+      rows.push({
+        name: entry.name,
+        status: "mocked",
+        url: entry.mock.url,
+        type: entry.mock.type,
+        isConnection: false,
+        isDynamic: false,
+      });
     }
   }
 

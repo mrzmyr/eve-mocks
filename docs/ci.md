@@ -47,7 +47,7 @@ latest run:
   "command": ["eve", "eval"],
   "exitCode": 0,
   "counts": { "mocked": 18, "allowed": 14, "blocked": 0 },
-  "targets": [{ "outcome": "mocked", "target": "tracker", "calls": 10, "tools": { "get_issue": 4 } }],
+  "targets": [{ "outcome": "mocked", "target": "linear", "calls": 10, "tools": { "get_issue": 4 } }],
   "log": ".eve-mocks/runs/2026-09-20T18-22-31-114Z-4821.jsonl"
 }
 ```

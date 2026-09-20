@@ -33,7 +33,7 @@ const PAGES: readonly Page[] = [
     source: "docs/defining-mocks.md",
     slug: "defining-mocks",
     title: "Defining mocks",
-    description: "MCP and REST mocks, spec forms, token endpoints, allowed upstreams, and the checks before a run.",
+    description: "MCP and HTTP mocks, spec forms, token endpoints, allowed upstreams, and the checks before a run.",
   },
   {
     source: "docs/schemas.md",
@@ -80,6 +80,45 @@ function toRoutes({ markdown }: { readonly markdown: string }): string {
   return out.replaceAll("(example)", "(https://github.com/mrzmyr/eve-mocks/tree/main/example)");
 }
 
+/**
+ * Turn the README's `<!-- site:… -->` regions into blume components. On GitHub
+ * the markers are invisible and the regions read as plain Markdown; MDX does
+ * not parse HTML comments, so every marker has to be gone afterwards.
+ * See https://useblume.dev/docs/content/components
+ */
+function toComponents({ markdown }: { readonly markdown: string }): string {
+  let out = markdown;
+
+  // The prompt is the body of the region's code fence. A JS string keeps its
+  // line breaks and backticks: the component copies the slot's `textContent`.
+  out = out.replaceAll(
+    /<!-- site:prompt (.+?) -->[\s\S]*?```text\n([\s\S]*?)```\s*<!-- \/site:prompt -->/g,
+    (_match, description: string, prompt: string) => {
+      return `<Prompt description=${JSON.stringify(description)} actions={["copy", "cursor"]}>\n  {${JSON.stringify(prompt.trim())}}\n</Prompt>`;
+    },
+  );
+
+  out = out.replaceAll(/<!-- site:filetree -->\n([\s\S]*?)<!-- \/site:filetree -->/g, (_match, list: string) => {
+    return `<FileTree>\n\n${list.trim()}\n\n</FileTree>`;
+  });
+
+  // Each `### 1. Title` of the region becomes a step; the component numbers them.
+  out = out.replaceAll(/<!-- site:steps -->\n([\s\S]*?)<!-- \/site:steps -->/g, (_match, region: string) => {
+    const steps = region
+      .split(/^### (?:\d+\. )?/m)
+      .slice(1)
+      .map((step) => {
+        const [title = "", ...body] = step.split("\n");
+
+        return `<Step title=${JSON.stringify(title.trim())}>\n\n${body.join("\n").trim()}\n\n</Step>`;
+      });
+
+    return `<Steps>\n\n${steps.join("\n\n")}\n\n</Steps>\n`;
+  });
+
+  return out;
+}
+
 /** Drop the first heading: the page title is rendered from the front matter. */
 function dropTitle({ markdown }: { readonly markdown: string }): string {
   return markdown.replace(/^#\s.*\n+/, "");
@@ -90,7 +129,7 @@ mkdirSync(OUT, { recursive: true });
 
 for (const page of PAGES) {
   const markdown = readFileSync(join(ROOT, page.source), "utf8");
-  const body = toRoutes({ markdown: dropTitle({ markdown }) });
+  const body = toComponents({ markdown: toRoutes({ markdown: dropTitle({ markdown }) }) });
   const frontMatter = `---\ntitle: ${page.title}\ndescription: ${page.description}\n---\n\n`;
 
   writeFileSync(join(OUT, `${page.slug}.mdx`), `${frontMatter}${body}`);

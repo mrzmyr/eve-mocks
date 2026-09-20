@@ -10,6 +10,7 @@ import type { Mock } from "./types.ts";
 export function oauthToken({ url }: { readonly url: string }): Mock {
   return {
     url,
+    type: "http",
     handle: async () => {
       return Response.json({ access_token: "mock-token", token_type: "Bearer", expires_in: 86_400 });
     },

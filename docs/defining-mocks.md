@@ -12,11 +12,11 @@ fixtures can live next to the mocks.
 **MCP server**, from its pulled `tools/list` plus one result per tool:
 
 ```ts
-// mocks/tracker.ts
+// mocks/linear.ts
 import { defineMcpMock } from "eve-mocks";
 
 export default defineMcpMock({
-  url: "https://tracker.example.com/mcp",
+  url: "https://mcp.linear.app/mcp",
   results: {
     get_issue: (args) => ({ identifier: String(args.id), title: "Stale numbers" }),
     list_teams: () => ({ teams: [TEAM] }),
@@ -34,7 +34,7 @@ connection that allows 20 of them gets a mock with 20 results, which lists 20
 tools. eve filters tools by the connection's
 allow-list anyway, so a tool without a result is one the model could not call.
 
-**REST upstream**, from pinned routes, its pulled OpenAPI document (3.0
+**HTTP upstream**, from pinned routes, its pulled OpenAPI document (3.0
 or 3.1), or both:
 
 ```ts
@@ -100,7 +100,7 @@ defineHttpMock({
 
 A mock file never spells the path of a pulled schema. The file name decides it:
 `mocks/notion.ts` reads `mocks/schemas/notion.openapi.json`, and
-`mocks/tracker.ts` reads `mocks/schemas/tracker.tools.json`. A URL inside a
+`mocks/linear.ts` reads `mocks/schemas/linear.tools.json`. A URL inside a
 `spec` array is numbered by its position: `mocks/schemas/shop.2.openapi.json`
 for the second entry. Commit the
 schemas: evals then run offline and without credentials, and a changed tool
@@ -142,8 +142,8 @@ its schema file. A mismatch stops the run with the nearest valid name:
 eve-mocks: Route POST /v1/serach matches no operation of https://api.notion.com/
   fix: Did you mean POST /v1/search? Paths use the spec's {param} syntax and methods are upper-case
 
-eve-mocks: Result "get_isue" names no tool of https://tracker.example.com/mcp
-  fix: Did you mean get_issue? Else refresh the schema file with eve-mocks pull tracker
+eve-mocks: Result "get_isue" names no tool of https://mcp.linear.app/mcp
+  fix: Did you mean get_issue? Else refresh the schema file with eve-mocks pull linear
 ```
 
 A schema file that was never pulled stops the run too:

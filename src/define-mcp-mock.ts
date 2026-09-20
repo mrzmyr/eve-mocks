@@ -91,6 +91,7 @@ export function defineMcpMock({
 
   return {
     url,
+    type: "mcp",
     handle: async (request, context) => {
       // Imported on the first call: the preload runs in every process the
       // agent spawns, and most of them never talk to this server.

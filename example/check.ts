@@ -22,7 +22,7 @@ const missing = await fetch("https://api.notion.com/v1/nope");
 assert.equal(missing.status, 404);
 
 const client = new Client({ name: "check", version: "0.0.0" });
-await client.connect(new StreamableHTTPClientTransport(new URL("https://tracker.example.com/mcp")) as never);
+await client.connect(new StreamableHTTPClientTransport(new URL("https://mcp.linear.app/mcp")) as never);
 const { tools } = await client.listTools();
 const call = (await client.callTool({ name: "get_issue", arguments: { id: "OPS-42" } })) as {
   content: ReadonlyArray<{ text: string }>;

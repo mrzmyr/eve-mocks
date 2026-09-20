@@ -1,3 +1,6 @@
+/** Protocol of an upstream, as `list` names it. */
+export type UpstreamType = "mcp" | "http";
+
 /** What eve-mocks tells a mock about itself when it calls it. */
 export type MockContext = {
   /** The mock's file name without extension; names its schema file. */
@@ -11,6 +14,8 @@ export type MockContext = {
 export type Mock = {
   /** Production URL prefix the agent calls. */
   readonly url: string;
+  /** What the upstream speaks: an MCP server, or any other HTTP API. Shown by `list`. */
+  readonly type: UpstreamType;
   /** Answers one intercepted request. */
   readonly handle: (request: Request, context: MockContext) => Promise<Response>;
   /**

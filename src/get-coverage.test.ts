@@ -6,7 +6,7 @@ import type { NamedMock } from "./load-mocks.ts";
 
 /** A mock that claims `url`; coverage never calls it. */
 function createMock({ name, url }: { readonly name: string; readonly url: string }): NamedMock {
-  return { name, mock: { url, handle: async () => new Response() } };
+  return { name, mock: { url, type: "mcp", handle: async () => new Response() } };
 }
 
 describe("getCoverage", () => {
@@ -18,7 +18,7 @@ describe("getCoverage", () => {
     });
 
     expect(rows).toEqual([
-      { name: "logs", status: "mocked", url: "https://logs.example.com/mcp", isConnection: true, isDynamic: true },
+      { name: "logs", status: "mocked", url: "https://logs.example.com/mcp", type: "mcp", isConnection: true, isDynamic: true },
     ]);
   });
 
@@ -44,26 +44,26 @@ describe("getCoverage", () => {
   test("lets a mock win over an allow entry, and lists an allow entry no connection uses", () => {
     const rows = getCoverage({
       connections: [
-        { name: "tracker", url: "https://tracker.example.com/mcp", protocol: "mcp" },
+        { name: "linear", url: "https://mcp.linear.app/mcp", protocol: "mcp" },
         { name: "reports", url: "https://reports.example.com/api", protocol: "openapi" },
       ],
-      mocks: [createMock({ name: "tracker", url: "https://tracker.example.com/" })],
+      mocks: [createMock({ name: "linear", url: "https://mcp.linear.app/" })],
       allowed: [
-        allow({ url: "https://tracker.example.com/" }),
+        allow({ url: "https://mcp.linear.app/" }),
         allow({ url: "https://reports.example.com/" }),
         allow({ url: "https://ai-gateway.vercel.sh/" }),
       ],
     });
 
     expect(
-      rows.map(({ name, status, isConnection }) => {
-        return { name, status, isConnection };
+      rows.map(({ name, status, type, isConnection }) => {
+        return { name, status, type, isConnection };
       }),
     ).toEqual([
-      { name: "ai-gateway.vercel.sh", status: "allowed", isConnection: false },
-      { name: "reports", status: "allowed", isConnection: true },
-      { name: "tracker", status: "mocked", isConnection: true },
-      { name: "tracker.example.com", status: "allowed", isConnection: false },
+      { name: "ai-gateway.vercel.sh", status: "allowed", type: undefined, isConnection: false },
+      { name: "linear", status: "mocked", type: "mcp", isConnection: true },
+      { name: "mcp.linear.app", status: "allowed", type: undefined, isConnection: false },
+      { name: "reports", status: "allowed", type: "http", isConnection: true },
     ]);
   });
 });

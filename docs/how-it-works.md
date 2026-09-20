@@ -25,24 +25,26 @@ untouched: no environment, no preload.
 The run ends with a summary; the `blocked` line is the to-do list:
 
 ```
-eve-mocks: mocked: auth 2, notion 6, tracker 10
-eve-mocks: allowed: ai-gateway.vercel.sh 14
-eve-mocks: blocked: logs.example.com 1
+eve-mocks
+  ✓ mocked    auth 2, notion 6, linear 10
+  → allowed   ai-gateway.vercel.sh 14
+  ✗ blocked   logs.example.com 1
+  report      .eve-mocks/report.json
 ```
 
 ## `list`
 
 ```
 eve connections
-  catalog               ✗ blocked   https://catalog.example.com/api
-  logs             ✗ blocked   https://logs.example.com/mcp (dynamic)
-  tracker                  ✓ mocked    https://tracker.example.com/mcp
-  reports                → allowed   https://reports.example.com
-  tenant-api              ✗ blocked   dynamic connection, its module constructs no URL before a session starts
+  catalog                 ✗ blocked   HTTP  https://catalog.example.com/api
+  linear                  ✓ mocked    MCP   https://mcp.linear.app/mcp
+  logs                    ✗ blocked   MCP   https://logs.example.com/mcp (dynamic)
+  reports                 → allowed   HTTP  https://reports.example.com
+  tenant-api              ✗ blocked   -     dynamic connection, its module constructs no URL before a session starts
 
 other upstreams
-  ai-gateway.vercel.sh    → allowed   https://ai-gateway.vercel.sh/
-  auth                    ✓ mocked    https://api.vercel.com/v1/connect/token/
+  ai-gateway.vercel.sh    → allowed   -     https://ai-gateway.vercel.sh/
+  auth                    ✓ mocked    HTTP  https://api.vercel.com/v1/connect/token/
 
 under --mocks: ✓ mocked: a mock answers · → allowed: reaches the real upstream · ✗ blocked: the call throws
 ```
@@ -62,10 +64,12 @@ eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "block
 ```
 
 ```json
-{ "name": "logs", "status": "blocked", "url": "https://logs.example.com/mcp", "isConnection": true, "isDynamic": true }
+{ "name": "logs", "status": "blocked", "url": "https://logs.example.com/mcp", "type": "mcp", "isConnection": true, "isDynamic": true }
 ```
 
-`url` is absent for a dynamic connection whose URL could not be read.
+`url` is absent for a dynamic connection whose URL could not be read. `type` is
+`mcp` or `http`, from the connection's protocol or else from the mock that
+answers it; an allow entry has none.
 
 Connections come from eve's compiled manifest
 (`.eve/compile/compiled-agent-manifest.json`). eve documents that file's path

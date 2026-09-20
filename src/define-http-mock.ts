@@ -309,6 +309,7 @@ export function defineHttpMock({
 
   return {
     url,
+    type: "http",
     handle: async (request, context) => {
       const loaded = loadSpec(context);
       const path = new URL(request.url).pathname.slice(basePath.length);

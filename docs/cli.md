@@ -31,7 +31,7 @@ eve-mocks list --json | jq '.[] | select(.status == "blocked")'
 ```
 
 ```json
-{ "name": "logs", "status": "blocked", "url": "https://logs.example.com/mcp", "isConnection": true, "isDynamic": true }
+{ "name": "logs", "status": "blocked", "url": "https://logs.example.com/mcp", "type": "mcp", "isConnection": true, "isDynamic": true }
 ```
 
 With `--json`, an error is JSON on stderr too, so stdout stays parseable:

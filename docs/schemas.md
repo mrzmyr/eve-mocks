@@ -11,7 +11,7 @@ eve-mocks add catalog     # scaffold mocks/catalog.ts from eve's manifest
 `pull` writes into `mocks/schemas/`. One failing upstream does not stop the
 others.
 
-- **REST**: downloads every URL in the mock's `spec`. A public spec needs
+- **HTTP**: downloads every URL in the mock's `spec`. A public spec needs
   nothing else, and a local path is skipped: it is read in place.
 - **MCP**: runs the official
   [MCP inspector](https://github.com/modelcontextprotocol/inspector) through
@@ -40,8 +40,8 @@ defineHttpMock({
 self-contained: read the environment, do not import app code. When auth is missing, the error says which of the two to use:
 
 ```
-tracker                  failed: tools/list failed for https://tracker.example.com/mcp
-  fix: The server uses OAuth. Run eve-mocks pull tracker once in a terminal to sign in through the browser; …
+linear                  failed: tools/list failed for https://mcp.linear.app/mcp
+  fix: The server uses OAuth. Run eve-mocks pull linear once in a terminal to sign in through the browser; …
 
 events                  failed: OpenAPI spec download failed for https://…/openapi.json
   fix: Check the spec URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" …
