@@ -55,8 +55,9 @@ workflow above uploads it as an artifact.
 ```
 
 `tools` counts MCP `tools/call` by tool name, which answers "did the agent call
-`create_issue`?". The call log of that run sits next to it, one JSON object per
-line; the last 10 runs are kept. The folder ignores itself in git.
+`create_issue`?". `report.json` is always the latest run. Every run also keeps
+its own timestamped report and call log (one JSON object per line) in
+`.eve-mocks/runs/`; the last 10 runs are kept. The folder ignores itself in git.
 
 ### How do I fail when a connection has no mock yet?
 

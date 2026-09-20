@@ -380,6 +380,15 @@ export function defineHttpMock({
         status: Number(code),
       });
     },
+    documents: (context) => {
+      return locate(context)
+        .filter((file) => {
+          return file.isRemote;
+        })
+        .map(({ entry, path }) => {
+          return { url: entry, path };
+        });
+    },
     check: async (context) => {
       const loaded = loadSpec(context);
 

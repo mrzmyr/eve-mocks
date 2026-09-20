@@ -1,6 +1,14 @@
 /** Protocol of an upstream, as `list` names it. */
 export type UpstreamType = "mcp" | "http";
 
+/** A remote document with the local copy `eve-mocks pull` saved. */
+export type MockDocument = {
+  /** URL the document is published at. */
+  readonly url: string;
+  /** Absolute path of the pulled copy. */
+  readonly path: string;
+};
+
 /** What eve-mocks tells a mock about itself when it calls it. */
 export type MockContext = {
   /** The mock's file name without extension; names its schema file. */
@@ -18,6 +26,12 @@ export type Mock = {
   readonly type: UpstreamType;
   /** Answers one intercepted request. */
   readonly handle: (request: Request, context: MockContext) => Promise<Response>;
+  /**
+   * Remote documents this mock holds a pulled copy of, such as its OpenAPI
+   * spec. A request for one is answered from the copy: an eve connection whose
+   * `spec` is a URL downloads it at run time, from a host the mock does not claim.
+   */
+  readonly documents?: (context: MockContext) => readonly MockDocument[];
   /**
    * Environment variables the mocked code path reads before it fetches.
    * Applied only where the variable is unset, so a real value always wins.

@@ -6,7 +6,7 @@ import type { CallRecord } from "./types.ts";
 /** Folder eve-mocks keeps its run artefacts in, relative to the app root. It ignores itself in git. */
 export const STATE_DIR = ".eve-mocks";
 
-/** Call logs kept in {@link STATE_DIR}; older ones are deleted when a run starts. */
+/** Runs (call log and report) kept in {@link STATE_DIR}; older ones are deleted when a run starts. */
 const KEPT_RUNS = 10;
 
 /** Calls to one target with one outcome. */
@@ -61,11 +61,17 @@ export function createLog({ root, startedAt }: { readonly root: string; readonly
     writeFileSync(ignore, "*\n");
   }
 
-  // ISO names sort by time, so the oldest logs come first.
-  const stale = readdirSync(runs).sort().slice(0, -(KEPT_RUNS - 1));
+  // ISO names sort by time, so the oldest runs come first. A run is a `.jsonl` log and its `.json` report.
+  const stale = readdirSync(runs)
+    .filter((name) => {
+      return name.endsWith(".jsonl");
+    })
+    .sort()
+    .slice(0, -(KEPT_RUNS - 1));
 
   for (const name of stale) {
     rmSync(join(runs, name), { force: true });
+    rmSync(join(runs, name.replace(/l$/, "")), { force: true });
   }
 
   // A colon is not valid in a Windows file name.
@@ -94,8 +100,9 @@ function readCalls({ log }: { readonly log: string }): CallRecord[] {
 }
 
 /**
- * Summarise a run's call log and write it to `.eve-mocks/report.json`, which
- * always holds the latest run.
+ * Summarise a run's call log and write it next to the log, as
+ * `.eve-mocks/runs/<start>.json`, and to `.eve-mocks/report.json`, which always
+ * holds the latest run.
  */
 export function writeReport({
   root,
@@ -144,7 +151,10 @@ export function writeReport({
 
   const report: Report = { command, startedAt: startedAt.toISOString(), exitCode, counts, targets, log };
 
-  writeFileSync(join(root, STATE_DIR, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  const json = `${JSON.stringify(report, null, 2)}\n`;
+
+  writeFileSync(log.replace(/l$/, ""), json);
+  writeFileSync(join(root, STATE_DIR, "report.json"), json);
 
   return report;
 }

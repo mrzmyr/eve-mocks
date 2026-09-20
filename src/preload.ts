@@ -10,7 +10,7 @@
  * whose URLs are unknown before a session starts.
  */
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 
 import { createError } from "./errors.ts";
 import { guardNodeHttp } from "./guard-node-http.ts";
@@ -171,6 +171,18 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (pass) {
     logCall({ outcome: "allowed", target: pass.name, method, url });
     return realFetch(input, init);
+  }
+
+  // A mock's own spec, which an eve connection downloads at run time.
+  for (const { name, mock } of mocks) {
+    const document = mock.documents?.({ name }).find((entry) => {
+      return entry.url === url;
+    });
+
+    if (document) {
+      logCall({ outcome: "mocked", target: name, method, url });
+      return new Response(readFileSync(document.path), { headers: { "content-type": "application/json" } });
+    }
   }
 
   // Last, so it only ever replaces a blocked call: a mock or an allow entry

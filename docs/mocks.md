@@ -58,6 +58,9 @@ export default defineHttpMock({
 | only the spec | the operation's example, else a sample generated from its schema |
 | neither | 404, as the real API would |
 
+A connection that downloads the same `spec` URL at run time gets the pulled copy,
+so that request needs no mock of its own.
+
 Routes are path, then upper-case method. Paths use the spec's `{param}` syntax,
 so they copy straight from it. Generated samples are smoke-test data
 (`"string"`, arrays of one), so pin anything an eval asserts on.

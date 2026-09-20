@@ -52,7 +52,9 @@ Run report
     { command, startedAt, exitCode, counts: { mocked, allowed, blocked },
       targets: [{ outcome, target, calls, tools? }], log }
   tools counts MCP tools/call by tool name. log is the call log of that run, one
-  JSON object per line; the last 10 are kept. The folder ignores itself in git.
+  JSON object per line. report.json is always the latest run; each run also keeps
+  its own report next to its log in .eve-mocks/runs/, the last 10 runs. The
+  folder ignores itself in git.
 
 Exit codes
   0    success

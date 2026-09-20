@@ -54,6 +54,23 @@ writeFileSync(
    attempt("loopback", () => http.get("http://127.0.0.1:9/").on("error", () => {}).destroy());`,
 );
 
+// A mock whose spec is a URL, with the copy `pull` would have saved.
+mkdirSync(join(APP_ROOT, "mocks/schemas"));
+writeFileSync(
+  join(APP_ROOT, "mocks/billing.ts"),
+  `import { defineHttpMock } from ${JSON.stringify(join(import.meta.dir, "index.ts"))};
+   export default defineHttpMock({ url: "https://billing.example.com/", spec: "https://specs.example.com/billing.json" });`,
+);
+writeFileSync(
+  join(APP_ROOT, "mocks/schemas/billing.json"),
+  JSON.stringify({ openapi: "3.1.0", info: { title: "Billing", version: "1" }, paths: {} }),
+);
+writeFileSync(
+  join(APP_ROOT, "spec.mjs"),
+  `const spec = await fetch("https://specs.example.com/billing.json");
+   console.log((await spec.json()).info.title);`,
+);
+
 // A connection's sign-in: an OAuth token request, then Vercel Connect, then a plain POST.
 writeFileSync(
   join(APP_ROOT, "sign-in.mjs"),
@@ -154,6 +171,15 @@ describe("cli", () => {
     expect(readFileSync(join(APP_ROOT, ".eve-mocks/.gitignore"), "utf8")).toBe("*\n");
   });
 
+  test("keeps a timestamped report per run next to its log", () => {
+    expect(run({ args: ["--", "node", "agent.mjs", "--mocks"], cwd: APP_ROOT }).status).toBe(0);
+
+    const latest = readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8");
+    const { log } = JSON.parse(latest);
+
+    expect(readFileSync(log.replace(/l$/, ""), "utf8")).toBe(latest);
+  });
+
   test("exits 127 with a fix when the wrapped command is not installed", () => {
     const { status, stderr } = run({ args: ["--", "no-such-command-eve-mocks"] });
 
@@ -207,5 +233,12 @@ describe("cli", () => {
     expect(stdout.trim().split("\n")).toEqual(["mock-token mock-token", "plain POST blocked"]);
     expect(stderr).toContain("answered by default");
     expect(status).toBe(1);
+  });
+
+  test("answers a request for a mock's spec URL from the pulled copy", () => {
+    const { stdout, status } = run({ args: ["--", "node", "spec.mjs", "--mocks"], cwd: APP_ROOT });
+
+    expect(stdout.trim()).toBe("Billing");
+    expect(status).toBe(0);
   });
 });
