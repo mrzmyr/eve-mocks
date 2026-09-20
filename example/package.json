@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "eval": "eve-mocks -- node check.ts"
+    "check": "eve-mocks -- bun check.ts"
   }
 }

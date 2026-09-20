@@ -97,7 +97,10 @@ Both are guarded either way: deny by default does not need to know the URL.
 Importing a connection module runs its top-level code, as eve's compile does.
 A module that fails to import is named on stderr and is shown without a URL. This
 needs Node 22.15 or newer
-([`module.registerHooks`](https://nodejs.org/api/module.html#moduleregisterhooksoptions)).
+([`module.registerHooks`](https://nodejs.org/api/module.html#moduleregisterhooksoptions)),
+which the CLI's shebang gives it under every package manager. Forced onto Bun
+(`bun --bun eve-mocks list`), `list` and `add` stop with that requirement rather
+than print a list without URLs. A run under `--mocks` works on both runtimes.
 
 ## Constraints
 
@@ -125,3 +128,6 @@ needs Node 22.15 or newer
 - **Not published yet.** Node refuses to strip types under `node_modules`, so
   the package needs a JavaScript build before it can ship to npm. Until then,
   link it (`bun link`, `npm link`): the symlink resolves to the source, which works.
+- **The wrapped command may run on Node or Bun.** The wrapper sets
+  `NODE_OPTIONS` and `BUN_OPTIONS`, so the mocks reach either. The CLI itself
+  runs on Node.

@@ -61,9 +61,9 @@ describe("getCoverage", () => {
       }),
     ).toEqual([
       { name: "ai-gateway.vercel.sh", status: "allowed", isConnection: false },
+      { name: "reports", status: "allowed", isConnection: true },
       { name: "tracker", status: "mocked", isConnection: true },
       { name: "tracker.example.com", status: "allowed", isConnection: false },
-      { name: "reports", status: "allowed", isConnection: true },
     ]);
   });
 });

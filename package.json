@@ -18,7 +18,9 @@
   ],
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "link:self": "mkdir -p node_modules && ln -sfn .. node_modules/eve-mocks",
+    "example": "bun run link:self && cd example && ../src/cli.ts -- bun check.ts --mocks"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

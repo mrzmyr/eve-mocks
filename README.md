@@ -6,7 +6,7 @@ processes: no servers, no ports, no mock branches in connection code. Under
 `--mocks`, a request that is neither mocked nor allowed throws.
 
 ```sh
-npm run eval -- --mocks
+bun run eval --mocks
 ```
 
 ```
@@ -18,10 +18,15 @@ eve-mocks: blocked: logs.example.com 1
 ## Set up, once
 
 ```sh
-npx eve-mocks init     # creates mocks/, wraps the dev and eval scripts in package.json
-npx eve info           # compiles the app, so eve-mocks can read its connections
-npx eve-mocks list     # what is mocked, allowed, and blocked
+bunx eve-mocks init     # creates mocks/, wraps the dev and eval scripts in package.json
+bunx eve info           # compiles the app, so eve-mocks can read its connections
+bunx eve-mocks list     # what is mocked, allowed, and blocked
 ```
+
+Commands are shown with bun, the runtime eve apps use; npm, pnpm, and yarn work
+the same. Only the flag differs: `npm run eval -- --mocks` needs the `--`, `bun
+run eval --mocks` does not. The CLI itself always runs on Node, whichever
+package manager starts it, because that is what its shebang asks for.
 
 `init` turns `"eval": "eve eval"` into `"eval": "eve-mocks -- eve eval"`.
 Without `--mocks` that script runs untouched, against the real APIs. A script
@@ -31,9 +36,9 @@ eve by hand. Add `"mocks": "eve-mocks"` to the scripts for the commands below.
 ## Mock a connection
 
 ```sh
-npm run mocks list             # 1. pick a row that says blocked
-npm run mocks add tracker       # 2. writes mocks/tracker.ts with its URL and protocol
-npm run mocks pull tracker      # 3. saves the real tool list or OpenAPI spec to mocks/schemas/
+bun run mocks list            # 1. pick a row that says blocked
+bun run mocks add tracker     # 2. writes mocks/tracker.ts with its URL and protocol
+bun run mocks pull tracker    # 3. saves the real tool list or OpenAPI spec to mocks/schemas/
 ```
 
 4\. Fill in what your evals assert on. An MCP server needs one result per tool:
@@ -94,8 +99,8 @@ either: [request rules](docs/how-it-works.md#what-happens-to-a-request-under---m
 ## Run in CI
 
 ```yaml
-- run: npm ci
-- run: npm run eval -- --mocks
+- run: bun install --frozen-lockfile
+- run: bun run eval --mocks
   env:
     AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }} # the one allowed upstream
 - uses: actions/upload-artifact@v4
@@ -116,14 +121,14 @@ either: [request rules](docs/how-it-works.md#what-happens-to-a-request-under---m
 To also fail when a connection has no mock yet, before any eval runs:
 
 ```yaml
-- run: npx eve info
-- run: npx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'
+- run: bunx eve info
+- run: bunx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'
 ```
 
 ## Something is off
 
 ```sh
-npx eve-mocks info     # versions, paths, counts, and each problem with its fix
+bunx eve-mocks info     # versions, paths, counts, and each problem with its fix
 ```
 
 Every error prints `why` and `fix`. Known limits, such as sandbox traffic and
