@@ -8,7 +8,7 @@ Under `--mocks` every request is mocked, explicitly allowed, or throws.
 
 ## Your first mock
 
-Six steps, from an agent that calls production to an eval that runs offline.
+Mock one upstream end to end. The same six steps repeat for the next one.
 
 ### 1. Install
 
