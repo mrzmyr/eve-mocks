@@ -1,0 +1,12 @@
+{
+  "name": "eve-mocks-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "blume dev",
+    "build": "blume build"
+  },
+  "devDependencies": {
+    "blume": "^1.7.2"
+  }
+}

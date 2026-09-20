@@ -1,3 +1,10 @@
 node_modules/
 .eve-mocks/
 .DS_Store
+site/content/
+site/dist/
+site/.blume/
+site/node_modules/
+.vercel
+site/.vercel/
+.vercel/
