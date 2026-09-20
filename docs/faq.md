@@ -1,6 +1,6 @@
 # FAQ
 
-Advanced usage and the questions that come up after the first mock.
+Start with [Mocks](mocks.md). These are the cases the basics do not cover.
 
 <!-- site:accordion -->
 
