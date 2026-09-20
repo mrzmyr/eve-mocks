@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "blume dev",
-    "build": "blume build"
+    "dev": "bun sync.ts && blume dev",
+    "build": "blume build",
+    "sync": "bun sync.ts",
+    "validate": "bun sync.ts && blume build && blume validate"
   },
   "devDependencies": {
     "blume": "^1.7.2"

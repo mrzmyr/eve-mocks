@@ -26,8 +26,8 @@ const PAGES: readonly Page[] = [
   {
     source: "README.md",
     slug: "index",
-    title: "Overview",
-    description: "Run an eve agent and its evals without credentials and without touching production.",
+    title: "Getting started",
+    description: "Six steps from an agent that calls production to an eval that runs offline.",
   },
   {
     source: "docs/defining-mocks.md",
@@ -40,6 +40,18 @@ const PAGES: readonly Page[] = [
     slug: "schemas",
     title: "Schema files",
     description: "Refresh a mock's schema with pull, scaffold one with add, and authenticate a protected upstream.",
+  },
+  {
+    source: "docs/ci.md",
+    slug: "ci",
+    title: "Run in CI",
+    description: "The workflow, the secrets you still need, the coverage gate, and the run report.",
+  },
+  {
+    source: "docs/cli.md",
+    slug: "cli",
+    title: "CLI",
+    description: "Every command, --json output, exit codes, and what coding agents can rely on.",
   },
   {
     source: "docs/how-it-works.md",

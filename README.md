@@ -1,47 +1,72 @@
 # eve-mocks
 
-Run an [eve](https://eve.dev/docs) agent and its evals without credentials and
-without touching production. Upstreams are answered inside the agent's own
-processes: no servers, no ports, no mock branches in connection code. Under
-`--mocks`, a request that is neither mocked nor allowed throws.
+Run an [eve](https://eve.dev/docs) agent and its evals with no credentials and
+no calls to production. Mocks answer inside the agent's own processes: no
+servers, no ports, no mock branches in connection code.
+
+Under `--mocks` every request is mocked, explicitly allowed, or throws.
+
+## Your first mock
+
+Six steps, from an agent that calls production to an eval that runs offline.
+
+### 1. Install
 
 ```sh
-bun run eval --mocks
+bun add -d eve-mocks
+bunx eve-mocks init
 ```
 
-```
-eve-mocks: mocked: auth 2, notion 6, tracker 10
-eve-mocks: allowed: ai-gateway.vercel.sh 14
-eve-mocks: blocked: logs.example.com 1
+`init` creates `mocks/` and sends the `dev` and `eval` scripts through the
+wrapper:
+
+```json
+"eval": "eve-mocks -- eve eval"
 ```
 
-## Set up, once
+Without `--mocks` that script still runs untouched, against the real APIs.
+
+Until the package is on npm, link it from a clone instead: see
+[constraints](docs/how-it-works.md#constraints).
+
+### 2. See what the agent calls
 
 ```sh
-bunx eve-mocks init     # creates mocks/, wraps the dev and eval scripts in package.json
-bunx eve info           # compiles the app, so eve-mocks can read its connections
-bunx eve-mocks list     # what is mocked, allowed, and blocked
+bunx eve info          # compiles the app, so eve-mocks can read its connections
+bun run mocks list
 ```
 
-Commands are shown with bun, the runtime eve apps use; npm, pnpm, and yarn work
-the same. Only the flag differs: `npm run eval -- --mocks` needs the `--`, `bun
-run eval --mocks` does not. The CLI itself always runs on Node, whichever
-package manager starts it, because that is what its shebang asks for.
+```
+eve connections
+  notion                  ✗ blocked   https://api.notion.com/
+  tracker                 ✗ blocked   https://tracker.example.com/mcp
+```
 
-`init` turns `"eval": "eve eval"` into `"eval": "eve-mocks -- eve eval"`.
-Without `--mocks` that script runs untouched, against the real APIs. A script
-that chains commands (`&&`, `;`, `|`) is skipped; wrap the command that starts
-eve by hand. Add `"mocks": "eve-mocks"` to the scripts for the commands below.
+Every connection starts `blocked`: under `--mocks` a call to it throws. Pick one
+and mock it.
 
-## Mock a connection
+### 3. Scaffold the mock
 
 ```sh
-bun run mocks list            # 1. pick a row that says blocked
-bun run mocks add tracker     # 2. writes mocks/tracker.ts with its URL and protocol
-bun run mocks pull tracker    # 3. saves the real tool list or OpenAPI spec to mocks/schemas/
+bun run mocks add tracker
 ```
 
-4\. Fill in what your evals assert on. An MCP server needs one result per tool:
+Writes `mocks/tracker.ts` with that connection's production URL and protocol,
+read from eve's own manifest.
+
+### 4. Save the upstream's schema
+
+```sh
+bun run mocks pull tracker
+```
+
+Downloads the server's tool list (MCP) or OpenAPI document (REST) into
+`mocks/schemas/`. Run this once on your machine and commit the result: evals
+then run offline, and CI never needs the upstream or its credentials.
+
+### 5. Pin what your eval asserts on
+
+An MCP server needs one result per tool:
 
 ```ts
 // mocks/tracker.ts
@@ -50,7 +75,7 @@ import { defineMcpMock } from "eve-mocks";
 export default defineMcpMock({
   url: "https://tracker.example.com/mcp",
   results: {
-    get_issue: (args) => ({ identifier: String(args.id), title: "Stale numbers" }),
+    get_issue: (args) => ({ identifier: String(args.id), title: "Checkout fails on retry" }),
   },
 });
 ```
@@ -70,21 +95,24 @@ export default defineHttpMock({
 });
 ```
 
-5\. Commit `mocks/` with `mocks/schemas/`. Evals then run offline, and a changed
-tool description shows up as a diff.
+Every name is checked against the schema before the agent starts, so a typo
+stops the run with `Did you mean get_issue?` instead of a strange answer
+mid-eval.
 
-A typo in a route or tool name stops the run before the agent starts, with the
-nearest valid name. More: [defining mocks](docs/defining-mocks.md) (spec forms,
-token endpoints, checks) and [schema files](docs/schemas.md) (auth for `pull`,
-OAuth-protected MCP servers).
+### 6. Run it
 
-## A run says `blocked`
+```sh
+bun run eval --mocks
+```
 
-A blocked call throws inside the agent and fails the run with exit 1. The
-`blocked:` line of the summary is the to-do list. For each host, either:
+```
+eve-mocks: mocked: tracker 10
+eve-mocks: blocked: api.notion.com 6
+```
 
-- **mock it**: [Mock a connection](#mock-a-connection), or
-- **let it through**, when the eval needs the real thing, such as the model:
+`mocked` was answered in-process. `blocked` is the to-do list: repeat steps 3
+to 5 for each host, or let it through when the eval needs the real thing, such
+as the model:
 
 ```ts
 // mocks/allowed.ts
@@ -93,61 +121,23 @@ import { allow } from "eve-mocks";
 export default [allow({ url: "https://ai-gateway.vercel.sh/" })];
 ```
 
-The thrown error carries the `allow(...)` line to paste. What passes without
-either: [request rules](docs/how-it-works.md#what-happens-to-a-request-under---mocks).
+The thrown error carries the `allow(...)` line to paste. A run that made a
+blocked call exits 1, even when every eval passed.
 
-## Run in CI
+A green run says so, and the last step is to commit `mocks/` with
+`mocks/schemas/`:
 
-```yaml
-- run: bun install --frozen-lockfile
-- run: bun run eval --mocks
-  env:
-    AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }} # the one allowed upstream
-- uses: actions/upload-artifact@v4
-  if: always()
-  with: { name: eve-mocks-report, path: .eve-mocks/report.json }
+```
+eve-mocks: mocked: auth 2, notion 6, tracker 10
+eve-mocks: allowed: ai-gateway.vercel.sh 14
+eve-mocks: report: .eve-mocks/report.json
 ```
 
-- **Schemas are committed, not pulled.** `pull` runs on your machine; CI reads
-  `mocks/schemas/` and needs neither the upstreams nor their credentials.
-- **A blocked call fails the run**, even when every eval passed: a model that
-  recovers from the thrown error would otherwise hide that the agent reached
-  for an upstream nobody decided on. Opt out with `--no-fail-on-blocked`.
-- **Secrets**: only those of the upstreams in `allowed.ts`. Token endpoints are
-  mocked; see [token endpoints](docs/defining-mocks.md#token-endpoints-and-allowed-upstreams).
-- **Report**: `.eve-mocks/report.json` holds the latest run: calls per upstream
-  and per MCP tool. The folder ignores itself in git. Shape: `eve-mocks --help`.
+## Where to go next
 
-To also fail when a connection has no mock yet, before any eval runs:
-
-```yaml
-- run: bunx eve info
-- run: bunx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'
-```
-
-## Something is off
-
-```sh
-bunx eve-mocks info     # versions, paths, counts, and each problem with its fix
-```
-
-Every error prints `why` and `fix`. Known limits, such as sandbox traffic and
-clients that do not use `fetch`: [constraints](docs/how-it-works.md#constraints).
-
-## For coding agents
-
-```sh
-eve-mocks --help             # every command, option, JSON shape, and exit code
-eve-mocks <command> --help
-eve-mocks list --json        # with --json, an error is JSON on stderr too
-```
-
-The help needs no README. stdout holds the result only; hints and errors go to
-stderr.
-
-## Reference
-
-- [Defining mocks](docs/defining-mocks.md): MCP and REST mocks, spec forms, token endpoints, allowed upstreams, checks
-- [Schema files](docs/schemas.md): `pull`, `add`, auth for protected upstreams
-- [How it works](docs/how-it-works.md): request rules, `list`, dynamic connections, constraints
-- [Example app](example)
+- **[Defining mocks](docs/defining-mocks.md)** — MCP and REST mocks in full: spec forms, routes, token endpoints, allowed upstreams, and the checks before a run.
+- **[Schema files](docs/schemas.md)** — `pull` and `add` in detail, plus auth for a protected upstream and OAuth-protected MCP servers.
+- **[Run in CI](docs/ci.md)** — the workflow, which secrets you still need, the coverage gate, and the run report.
+- **[CLI](docs/cli.md)** — every command, `--json`, exit codes, and what coding agents can rely on.
+- **[How it works](docs/how-it-works.md)** — the preload, what happens to each request, dynamic connections, and the known limits.
+- **[Example app](example)** — a tiny app with mocks, run under both Node and Bun.

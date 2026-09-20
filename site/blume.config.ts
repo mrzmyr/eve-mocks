@@ -7,5 +7,6 @@ export default defineConfig({
   description:
     "In-process upstream mocks for eve agents: run an agent and its evals without credentials and without touching production.",
   content: { root: "content" },
+  lastModified: true,
   deployment: { site: "https://eve-mocks.vercel.app" },
 });
