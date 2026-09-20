@@ -134,36 +134,32 @@ bun run eval --mocks
 ```
 
 ```
-eve-mocks  6 calls, 3 blocked
+eve-mocks  5 calls, 2 blocked
 
-  ✓ mocked    linear                   3   get_issue 3
-  ✗ blocked   ai-gateway.vercel.sh     1
-              api.notion.com           2   connection "notion"
+  ✓ mocked    linear             3   get_issue 3
+  ✗ blocked   api.notion.com     2   connection "notion"
 
   report      .eve-mocks/report.json
 ```
 
-Linear was answered in-process. Everything else was blocked, and a blocked call
-fails the run with exit 1. Each blocked row is a to-do:
-
-- **Notion** is another upstream to mock: repeat steps 3 to 5.
-- **The model** has to stay real, so [allow](docs/allow.md) it:
+Linear was answered in-process. Notion was blocked, and a blocked call fails
+the run with exit 1. Mock it too by repeating steps 3 to 5, or
+[allow](docs/allow.md) it when the eval needs the real thing:
 
 ```ts
-// mocks/ai-gateway.ts
+// mocks/notion.ts
 import { allow } from "eve-mocks";
 
-export default allow({ url: "https://ai-gateway.vercel.sh/" });
+export default allow({ url: "https://api.notion.com/" });
 ```
 
 A green run has no `blocked` row. Commit `mocks/`:
 
 ```
-eve-mocks  25 calls, none blocked
+eve-mocks  5 calls, none blocked
 
-  ✓ mocked    linear          3   get_issue 3
-              notion          8
-  → allowed   ai-gateway     14
+  ✓ mocked    linear     3   get_issue 3
+  → allowed   notion     2
 
   report      .eve-mocks/report.json
 ```

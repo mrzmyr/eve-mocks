@@ -156,7 +156,7 @@ function toAnsi({ markdown }: { readonly markdown: string }): string {
     const isOutput = fence.opener === "```" && /✓ mocked|→ allowed|✗ blocked|^eve-mocks/m.test(fence.body.join("\n"));
 
     if (isOutput) {
-      out.push("```ansi", ...fence.body.map((row) => paintLine({ line: row })), "```");
+      out.push('```ansi title="Terminal"', ...fence.body.map((row) => paintLine({ line: row })), "```");
     } else {
       out.push(fence.opener, ...fence.body, "```");
     }
