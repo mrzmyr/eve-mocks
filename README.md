@@ -169,10 +169,9 @@ A green run has no `block` row. Commit `mocks/`:
 ## Next Steps
 
 - **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and protected upstreams.
-- **[Authentication](docs/authentication.md)**: sign-ins are answered for you, and the one exception.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a block does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
-- **[FAQ](docs/faq.md)**: several specs on one host, local spec files, and clients that do not use `fetch`.
+- **[FAQ](docs/faq.md)**: sign-ins, several specs on one host, local spec files, and clients that do not use `fetch`.
 - **[Run in CI](docs/ci.md)**: the workflow, secrets, the coverage gate, and the run report.
 - **[Constraints](docs/constraints.md)**: what is not mocked, and why.
 - **[Example app](example)**: a tiny app with mocks, run under Node and Bun.

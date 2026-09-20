@@ -4,6 +4,46 @@ Start with [Mocks](mocks.md). These are the cases the basics do not cover.
 
 <!-- site:accordion -->
 
+### Do I have to mock a connection's sign-in?
+
+No. A connection signs in before it calls its upstream, and eve-mocks answers
+that sign-in itself. The connection's own auth code runs unchanged and gets
+`mock-token`, which a mocked upstream accepts. No client secret is needed, not
+locally and not in CI.
+
+```
+❅ eve-mocks  4 calls, no block
+
+  ✓ mock      sign-in     1   answered by default
+              linear      3   get_issue 3
+
+  report      .eve-mocks/report.json
+```
+
+| Sign-in | Recognised by |
+| --- | --- |
+| [Vercel Connect](https://vercel.com/docs/connect) | its token endpoint, `api.vercel.com/v1/connect/token/` |
+| any OAuth 2.0 token endpoint | `grant_type` in the request body, which [every grant sends](https://datatracker.ietf.org/doc/html/rfc6749#section-4) |
+
+A mock or an [allow](allow.md) entry for the same URL wins, so allowing a token
+endpoint still reaches the real one. Signing in to download a schema is a
+different topic: [pull from a protected upstream](mocks.md#protected-upstreams).
+
+### My token endpoint sends no `grant_type`. Why is it blocked?
+
+Only a request with `grant_type` is recognised as a sign-in. Any other token
+endpoint is blocked like every request. Mock it by its URL:
+
+```ts
+// mocks/auth.ts
+import { oauthToken } from "eve-mocks";
+
+export default oauthToken({ url: "https://auth.example.com/token" });
+```
+
+It answers `{ access_token: "mock-token", token_type: "Bearer" }`. For another
+shape, use [`defineHttpMock`](mocks.md#http) with a route.
+
 ### Several connections share one host. How do I mock them?
 
 Give `spec` an array. The operations are merged, and each document keeps its own

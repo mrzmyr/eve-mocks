@@ -41,12 +41,6 @@ const PAGES: readonly Page[] = [
     description: "Mock an MCP server or an HTTP API, and keep its schema next to it.",
   },
   {
-    source: "docs/authentication.md",
-    slug: "authentication",
-    title: "Authentication",
-    description: "Sign-ins are answered for you. Here is how, and the one exception.",
-  },
-  {
     source: "docs/allow.md",
     slug: "allow",
     title: "Allow",
@@ -63,7 +57,7 @@ const PAGES: readonly Page[] = [
     slug: "faq",
     group: "Reference",
     title: "FAQ",
-    description: "The six cases the basics do not cover.",
+    description: "Sign-ins, and the cases the basics do not cover.",
   },
   {
     source: "docs/ci.md",
