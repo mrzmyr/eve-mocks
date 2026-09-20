@@ -71,16 +71,16 @@ guardNodeHttp({
     const match = mocks.find(({ mock }) => {
       return url.startsWith(mock.url);
     });
-    let fix = `Add allow({ url: "${protocol}//${host}/" }) in the mocks directory, or call it with fetch and add a mock`;
+    let fix = `Call it with fetch and mock it: eve-mocks add <connection>, or write mocks/<name>.ts\n       Or allow it in mocks/<name>.ts: export default allow({ url: "${protocol}//${host}/" })`;
 
     if (match) {
-      fix = `The mock "${match.name}" covers this URL but answers fetch only. Call it with fetch, or allow({ url: "${protocol}//${host}/" }) to reach the real upstream`;
+      fix = `The mock "${match.name}" covers this URL but answers fetch only: call it with fetch\n       Or allow it in mocks/<name>.ts: export default allow({ url: "${protocol}//${host}/" })`;
     }
 
     throw createError({
       status: 403,
-      message: `${host} is neither mocked nor allowed`,
-      why: `The agent called ${url} through ${module} under --mocks. eve-mocks blocks that module but cannot answer it, and lets no request out unless it is allowed`,
+      message: `eve-mocks blocked ${method} ${url}`,
+      why: `Under --mocks a request must be mocked or allowed, and ${host} is neither. It went through ${module}, which eve-mocks blocks but cannot answer`,
       fix,
     });
   },
@@ -171,8 +171,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
   throw createError({
     status: 403,
-    message: `${host} is neither mocked nor allowed`,
-    why: `The agent called ${url} under --mocks, and eve-mocks lets no unmocked request out unless it is allowed`,
-    fix: `Add a mock for it, or allow({ url: "${protocol}//${host}/" }) in the mocks directory`,
+    message: `eve-mocks blocked ${method} ${url}`,
+    why: `Under --mocks a request must be mocked or allowed, and ${host} is neither`,
+    fix: `Mock it: eve-mocks add <connection>, or write mocks/<name>.ts\n       Or allow it in mocks/<name>.ts: export default allow({ url: "${protocol}//${host}/" })`,
   });
+
 }) as typeof fetch;

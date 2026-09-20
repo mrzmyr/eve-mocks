@@ -63,7 +63,7 @@ Its module builds the URL inside the `session.started` handler, so there is
 nothing to read before a session. `add` cannot scaffold it; write
 `mocks/<connection-name>.ts` by hand. The file name must equal the connection
 name, because that is how it is matched. Calls to it are blocked either way.
-More: [dynamic connections](how-it-works.md#dynamic-connections).
+More: [dynamic connections](constraints.md#dynamic-connections-built-per-session).
 
 ### My client uses axios, got, or a gRPC SDK. Is it mocked?
 
@@ -80,7 +80,7 @@ reach. What it may call is decided by the sandbox's own network policy.
 
 You should not need to. `pull` runs on your machine, and the schemas are
 committed. CI reads them from the repository and needs neither the upstreams
-nor their credentials. See [Run in CI](guides/ci.md).
+nor their credentials. See [Run in CI](ci.md).
 
 ### Does it work with npm, pnpm, or yarn?
 
@@ -106,6 +106,6 @@ Yes, point `--dir` at another folder: `eve-mocks --dir mocks/outage -- eve eval
 ### Is it on npm?
 
 Not yet. Until then, link it from a clone with `bun link`. See
-[constraints](how-it-works.md#constraints).
+[Constraints](constraints.md#not-published-yet).
 
 <!-- /site:accordion -->

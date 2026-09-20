@@ -128,8 +128,7 @@ Examples
 
   init: `eve-mocks init [--dir <path>]
 
-Create the mocks directory with a Vercel Connect mock and an allow entry for the
-model gateway, route the app's \`dev\` and \`eval\` scripts in
+Create the mocks directory, route the app's \`dev\` and \`eval\` scripts in
 package.json through \`eve-mocks --\`, and add a \`mocks\` script for this CLI.
 Safe to rerun: existing files and scripts are left alone.
 

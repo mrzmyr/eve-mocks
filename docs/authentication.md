@@ -21,8 +21,6 @@ export default [vercelConnect(), oauthToken({ url: "https://auth.example.com/oau
 | `vercelConnect()` | the [Vercel Connect](https://vercel.com/docs/connect) token endpoint |
 | `oauthToken({ url })` | any OAuth 2.0 token endpoint; answers `access_token: "mock-token"` |
 
-`init` creates the `vercelConnect()` mock for you, as `mocks/vercel-connect.ts`.
-
 ## Pull from a protected upstream
 
 `pull` is the one command that calls a real upstream, and it runs on your

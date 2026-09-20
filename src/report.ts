@@ -17,6 +17,8 @@ export type TargetCount = {
   readonly target: string;
   /** Number of calls. */
   readonly calls: number;
+  /** First URL called, so a blocked target can be turned into a mock or an allow entry. */
+  readonly url: string;
   /** Calls per MCP tool, for a target whose calls named one. */
   readonly tools?: Readonly<Record<string, number>>;
 };
@@ -109,11 +111,14 @@ export function writeReport({
   readonly exitCode: number;
 }): Report {
   const counts = { mocked: 0, allowed: 0, blocked: 0 };
-  const byTarget = new Map<string, { outcome: CallRecord["outcome"]; target: string; calls: number; tools: Record<string, number> }>();
+  const byTarget = new Map<
+    string,
+    { outcome: CallRecord["outcome"]; target: string; calls: number; url: string; tools: Record<string, number> }
+  >();
 
-  for (const { outcome, target, tool } of readCalls({ log })) {
+  for (const { outcome, target, tool, url } of readCalls({ log })) {
     const key = `${outcome} ${target}`;
-    const entry = byTarget.get(key) ?? { outcome, target, calls: 0, tools: {} };
+    const entry = byTarget.get(key) ?? { outcome, target, calls: 0, url, tools: {} };
 
     counts[outcome] += 1;
     entry.calls += 1;

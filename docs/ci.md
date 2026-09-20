@@ -30,10 +30,10 @@ Opt out with `--no-fail-on-blocked`, in the wrapped command or before `--`.
 
 ## Secrets
 
-Only the upstreams you [allow](../allow.md) need one, usually just the model gateway.
+Only the upstreams you [allow](allow.md) need one, usually just the model gateway.
 Connection credentials are not needed, because the token endpoints are mocked
 and each connection's real token code still runs against them. See
-[token endpoints](../authentication.md#token-endpoints).
+[token endpoints](authentication.md#token-endpoints).
 
 ## The run report
 

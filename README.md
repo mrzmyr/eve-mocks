@@ -40,20 +40,13 @@ bunx eve-mocks init
 wrapper. Without `--mocks` those scripts still run untouched, against the real
 APIs.
 
-<!-- site:filetree -->
-- mocks/
-  - model-gateway.ts
-  - vercel-connect.ts
-- package.json
-<!-- /site:filetree -->
-
 ```json
 "eval": "eve-mocks -- eve eval",
 "mocks": "eve-mocks"
 ```
 
 Until the package is on npm, link it from a clone instead: see
-[constraints](docs/how-it-works.md#constraints).
+[Constraints](docs/constraints.md#not-published-yet).
 
 ### 2. List Mocks
 
@@ -82,8 +75,6 @@ eve's own manifest.
 <!-- site:filetree -->
 - mocks/
   - linear.ts
-  - model-gateway.ts
-  - vercel-connect.ts
 <!-- /site:filetree -->
 
 ### 4. Pull Schema
@@ -101,13 +92,11 @@ the upstream or its credentials.
   - schemas/
     - linear.tools.json
   - linear.ts
-  - model-gateway.ts
-  - vercel-connect.ts
 <!-- /site:filetree -->
 
 ### 5. Pin Results
 
-An MCP server needs one result per tool your evals use:
+Give every tool your evals use a result:
 
 ```ts
 // mocks/linear.ts
@@ -121,56 +110,65 @@ export default defineMcpMock({
 });
 ```
 
-An HTTP upstream answers from its spec, plus the routes you pin:
+Every name is checked against the schema before the agent starts, so a typo
+stops the run with `Did you mean get_issue?` instead of a strange answer
+mid-eval. [HTTP APIs are mocked from their OpenAPI spec](docs/mocks.md#http).
+
+### 6. Run Evals
+
+This eval reads an issue from Linear and a page from Notion:
 
 ```ts
-// mocks/notion.ts
-import { defineHttpMock } from "eve-mocks";
+// evals/roadmap.eval.ts
+import { defineEval } from "eve/evals";
+import { includes } from "eve/evals/expect";
 
-export default defineHttpMock({
-  url: "https://api.notion.com/",
-  spec: "https://developers.notion.com/openapi.json",
-  routes: {
-    "/v1/pages/{page_id}": { GET: ({ params }) => ({ ...PAGE, id: params.page_id }) },
+export default defineEval({
+  description: "Reads an issue from Linear and the roadmap page from Notion.",
+  async test(t) {
+    await t.send("What is blocking LIN-42, and is it on the Notion roadmap page?");
+    t.succeeded();
+    t.check(t.reply, includes("Checkout fails on retry"));
   },
 });
 ```
-
-Every name is checked against the schema before the agent starts, so a typo
-stops the run with `Did you mean get_issue?` instead of a strange answer
-mid-eval.
-
-### 6. Run Evals
 
 ```sh
 bun run eval --mocks
 ```
 
 ```
-eve-mocks
-  ✓ mocked    linear 10
-  ✗ blocked   api.notion.com 6
+eve-mocks  6 calls, 3 blocked
+
+  ✓ mocked    linear                   3   get_issue 3
+  ✗ blocked   ai-gateway.vercel.sh     1
+              api.notion.com           2   connection "notion"
+
   report      .eve-mocks/report.json
 ```
 
-`mocked` was answered in-process. `blocked` is the to-do list, and it fails the
-run with exit 1 even when every eval passed. Repeat steps 3 to 5 for each host,
-or let it through when the eval needs the real thing. `init` already did that
-for the model:
+Linear was answered in-process. Everything else was blocked, and a blocked call
+fails the run with exit 1. Each blocked row is a to-do:
+
+- **Notion** is another upstream to mock: repeat steps 3 to 5.
+- **The model** has to stay real, so [allow](docs/allow.md) it:
 
 ```ts
-// mocks/model-gateway.ts
+// mocks/ai-gateway.ts
 import { allow } from "eve-mocks";
 
 export default allow({ url: "https://ai-gateway.vercel.sh/" });
 ```
 
-A green run has no `blocked` row. Commit `mocks/` with `mocks/schemas/`:
+A green run has no `blocked` row. Commit `mocks/`:
 
 ```
-eve-mocks
-  ✓ mocked    auth 2, notion 6, linear 10
-  → allowed   model-gateway 14
+eve-mocks  25 calls, none blocked
+
+  ✓ mocked    linear          3   get_issue 3
+              notion          8
+  → allowed   ai-gateway     14
+
   report      .eve-mocks/report.json
 ```
 
@@ -182,7 +180,7 @@ eve-mocks
 - **[Authentication](docs/authentication.md)**: mock token endpoints, and pull from a protected upstream.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
-- **[Run in CI](docs/guides/ci.md)**: the workflow, secrets, the coverage gate, and the run report.
 - **[FAQ](docs/faq.md)**: several specs on one host, local spec files, dynamic connections, and more.
-- **[How it works](docs/how-it-works.md)**: the preload, request rules, and the known limits.
+- **[Run in CI](docs/ci.md)**: the workflow, secrets, the coverage gate, and the run report.
+- **[Constraints](docs/constraints.md)**: what is not mocked, and why.
 - **[Example app](example)**: a tiny app with mocks, run under Node and Bun.

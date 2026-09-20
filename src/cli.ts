@@ -68,38 +68,148 @@ function formatOutcome({
 /** Label of each upstream type in `list`. */
 const TYPE_LABELS = { mcp: "MCP", http: "HTTP" } as const;
 
+/** A count with its noun: `1 call`, `3 calls`. */
+function formatCount({ count, noun }: { readonly count: number; readonly noun: string }): string {
+  if (count === 1) {
+    return `1 ${noun}`;
+  }
+
+  return `${count} ${noun}s`;
+}
+
 /**
  * Print what was mocked, what went to a real upstream, and what was blocked.
  *
- * One titled block on stderr, in the icons and colours of `list`. The title
- * tells the block apart from the wrapped command's own output, so its rows
- * need no prefix.
+ * One titled block on stderr, in the icons and colours of `list`, one row per
+ * upstream. The title tells the block apart from the wrapped command's own
+ * output, so its rows need no prefix.
+ *
+ * @param input.notes - Text after a target's count, by target: the connection a blocked host belongs to.
  */
-function printReport({ report }: { readonly report: Report }): void {
+function printReport({
+  report,
+  notes,
+}: {
+  readonly report: Report;
+  readonly notes: ReadonlyMap<string, string>;
+}): void {
   const stream = process.stderr;
+  const total = report.counts.mocked + report.counts.allowed + report.counts.blocked;
+  let headline = `${formatCount({ count: total, noun: "call" })}, none blocked`;
 
-  console.error(`\n${styleText("bold", "eve-mocks", { stream })}`);
+  if (report.counts.blocked > 0) {
+    headline = `${formatCount({ count: total, noun: "call" })}, ${report.counts.blocked} blocked`;
+  }
+
+  if (total === 0) {
+    headline = "no upstream call was made";
+  }
+
+  console.error(`\n${styleText("bold", "eve-mocks", { stream })}  ${styleText("dim", headline, { stream })}\n`);
+
+  const width = Math.max(
+    ...report.targets.map(({ target }) => {
+      return target.length;
+    }),
+    0,
+  );
 
   for (const outcome of ["mocked", "allowed", "blocked"] as const) {
-    const counts = report.targets
-      .filter((entry) => {
-        return entry.outcome === outcome;
-      })
-      .map(({ target, calls }) => {
-        return `${target} ${calls}`;
-      })
-      .join(", ");
+    const rows = report.targets.filter((entry) => {
+      return entry.outcome === outcome;
+    });
 
-    if (counts !== "") {
-      console.error(`  ${formatOutcome({ outcome, width: 12, stream })}${counts}`);
+    for (const [index, { target, calls, tools = {} }] of rows.entries()) {
+      // The outcome labels a group once; the rows below it line up under the first.
+      let label = " ".repeat(12);
+
+      if (index === 0) {
+        label = formatOutcome({ outcome, width: 12, stream });
+      }
+
+      const detail =
+        notes.get(target) ??
+        Object.entries(tools)
+          .sort(([, a], [, b]) => {
+            return b - a;
+          })
+          .map(([tool, count]) => {
+            return `${tool} ${count}`;
+          })
+          .join(", ");
+
+      console.error(`  ${label}${target.padEnd(width)}  ${String(calls).padStart(4)}   ${styleText("dim", detail, { stream })}`.trimEnd());
     }
   }
 
-  if (report.targets.length === 0) {
-    console.error("  no upstream call was made");
+  if (total > 0) {
+    console.error("");
   }
 
   console.error(styleText("dim", `  ${"report".padEnd(12)}${join(STATE_DIR, "report.json")}`, { stream }));
+}
+
+/**
+ * The eve connection each blocked host belongs to, by host. Best effort, for
+ * the hint only: without a compiled manifest, or when a connection module does
+ * not load, the hosts are reported without a connection.
+ */
+async function findConnections({ hosts }: { readonly hosts: readonly string[] }): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+
+  // Resolving imports the app's connection modules: only worth it when there is something to explain.
+  if (hosts.length === 0) {
+    return found;
+  }
+
+  try {
+    const connections = await resolveConnections({ connections: readManifest({ root: process.cwd() }) });
+
+    for (const { name, url } of connections) {
+      if (url !== undefined && hosts.includes(new URL(url).host)) {
+        found.set(new URL(url).host, name);
+      }
+    }
+  } catch {
+    // The hint is optional; the run's own result must not depend on it.
+  }
+
+  return found;
+}
+
+/**
+ * The error for a run that made blocked calls, with one fix per blocked host:
+ * the commands for a host that is an eve connection, else the file to write.
+ */
+function createBlockedError({
+  report,
+  connections,
+}: {
+  readonly report: Report;
+  readonly connections: ReadonlyMap<string, string>;
+}): MockError {
+  const fixes = report.targets
+    .filter(({ outcome }) => {
+      return outcome === "blocked";
+    })
+    .flatMap(({ target, url }) => {
+      const { protocol, host } = new URL(url);
+      const connection = connections.get(target);
+      const allowLine = `allow it in mocks/<name>.ts: export default allow({ url: "${protocol}//${host}/" })`;
+
+      if (connection !== undefined) {
+        return [`${target}: mock it with eve-mocks add ${connection} && eve-mocks pull ${connection}`, `  or ${allowLine}`];
+      }
+
+      return [`${target}: mock it in mocks/<name>.ts with defineHttpMock({ url: "${protocol}//${host}/" })`, `  or ${allowLine}`];
+    });
+
+  return createError({
+    status: 403,
+    message: `${formatCount({ count: report.counts.blocked, noun: "blocked call" })} failed the run`,
+    why: "The command succeeded, but the agent called an upstream that is neither mocked nor allowed, and a model that recovers from the thrown error would hide that",
+    fix: [...fixes, `To let such a run pass, add ${ALLOW_BLOCKED_FLAG}`].join("\n       "),
+  });
 }
 
 /** Load the mocks and run each one's `check` against its schema file. */
@@ -220,21 +330,29 @@ async function run({
     },
   });
 
-  child.on("exit", (code) => {
+  child.on("exit", async (code) => {
     const exitCode = code ?? 1;
     const report = writeReport({ root, log, command: [file, ...args], startedAt, exitCode });
+    const blocked = report.targets.filter(({ outcome }) => {
+      return outcome === "blocked";
+    });
+    const connections = await findConnections({
+      hosts: blocked.map(({ target }) => {
+        return target;
+      }),
+    });
 
-    printReport({ report });
+    printReport({
+      report,
+      notes: new Map(
+        [...connections].map(([host, name]) => {
+          return [host, `connection "${name}"`];
+        }),
+      ),
+    });
 
-    if (exitCode === 0 && report.counts.blocked > 0 && shouldFailOnBlocked && !command.includes(ALLOW_BLOCKED_FLAG)) {
-      const error = createError({
-        status: 403,
-        message: `The run made blocked calls: ${report.counts.blocked}`,
-        why: "The command succeeded, but the agent called upstreams that are neither mocked nor allowed; see the blocked line above",
-        fix: `Mock or allow() each blocked host. To let such a run pass, add ${ALLOW_BLOCKED_FLAG}`,
-      });
-
-      console.error(`eve-mocks: ${error.message}`);
+    if (exitCode === 0 && blocked.length > 0 && shouldFailOnBlocked && !command.includes(ALLOW_BLOCKED_FLAG)) {
+      console.error(`\neve-mocks: ${createBlockedError({ report, connections }).message}`);
       process.exit(1);
     }
 
@@ -493,15 +611,6 @@ async function add({ dir, name }: { readonly dir: string; readonly name: string 
 function init({ dir }: { readonly dir: string }): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, "vercel-connect.ts"),
-      `import { vercelConnect } from "eve-mocks";\n\nexport default vercelConnect();\n`,
-    );
-    // Evals need a real model, so the first run would always end blocked without it.
-    writeFileSync(
-      join(dir, "model-gateway.ts"),
-      `import { allow } from "eve-mocks";\n\n// Stays real: evals need a model. One file per allowed upstream; delete it to block the gateway too.\nexport default allow({ url: "https://ai-gateway.vercel.sh/" });\n`,
-    );
     console.log(`created ${dir}`);
   }
 

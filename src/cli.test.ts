@@ -117,7 +117,8 @@ describe("cli", () => {
     const { status, stderr } = run({ args: ["--", "node", "agent.mjs", "--stray", "--mocks"], cwd: APP_ROOT });
 
     expect(status).toBe(1);
-    expect(stderr).toContain("The run made blocked calls: 1");
+    expect(stderr).toContain("1 blocked call failed the run");
+    expect(stderr).toContain('allow({ url: "https://stray.example.com/" })');
   });
 
   test("lets that run pass with --no-fail-on-blocked, in the command or before --", () => {
@@ -134,7 +135,9 @@ describe("cli", () => {
     const report = JSON.parse(readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8"));
 
     expect(report.counts).toEqual({ mocked: 1, allowed: 0, blocked: 0 });
-    expect(report.targets).toEqual([{ outcome: "mocked", target: "shop", calls: 1, tools: { get_order: 1 } }]);
+    expect(report.targets).toEqual([
+      { outcome: "mocked", target: "shop", calls: 1, url: "https://shop.example.com/mcp", tools: { get_order: 1 } },
+    ]);
     expect(readFileSync(join(APP_ROOT, ".eve-mocks/.gitignore"), "utf8")).toBe("*\n");
   });
 
@@ -158,10 +161,10 @@ describe("cli", () => {
       const lines = stdout.trim().split("\n");
 
       expect(lines).toEqual([
-        "https-named-import BLOCKED stray.example.com is neither mocked nor allowed",
-        "http-options BLOCKED stray.example.com is neither mocked nor allowed",
-        "http2 BLOCKED stray.example.com is neither mocked nor allowed",
-        "mocked-host BLOCKED shop.example.com is neither mocked nor allowed",
+        "https-named-import BLOCKED eve-mocks blocked GET https://stray.example.com/x",
+        "http-options BLOCKED eve-mocks blocked POST http://stray.example.com/y",
+        "http2 BLOCKED eve-mocks blocked CONNECT https://stray.example.com/",
+        "mocked-host BLOCKED eve-mocks blocked GET https://shop.example.com/mcp",
         "loopback REACHED",
       ]);
       expect(status).toBe(1);

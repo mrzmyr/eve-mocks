@@ -59,13 +59,6 @@ const PAGES: readonly Page[] = [
     description: "Every command, --json output, exit codes, and what coding agents can rely on.",
   },
   {
-    source: "docs/guides/ci.md",
-    slug: "ci",
-    group: "Guides",
-    title: "Run in CI",
-    description: "The workflow, the secrets you still need, the coverage gate, and the run report.",
-  },
-  {
     source: "docs/faq.md",
     slug: "faq",
     group: "Reference",
@@ -73,11 +66,18 @@ const PAGES: readonly Page[] = [
     description: "Advanced usage: several specs on one host, local spec files, dynamic connections, and more.",
   },
   {
-    source: "docs/how-it-works.md",
-    slug: "how-it-works",
+    source: "docs/ci.md",
+    slug: "ci",
     group: "Reference",
-    title: "How it works",
-    description: "The preload, what happens to a request, list, dynamic connections, and the known constraints.",
+    title: "Run in CI",
+    description: "The workflow, the secrets you still need, the coverage gate, and the run report.",
+  },
+  {
+    source: "docs/constraints.md",
+    slug: "constraints",
+    group: "Reference",
+    title: "Constraints",
+    description: "What eve-mocks does not mock, and why.",
   },
 ];
 
@@ -119,6 +119,45 @@ function toRoutes({ markdown }: { readonly markdown: string }): string {
 }
 
 /**
+ * A nested Markdown list as blume's `Tree`: an item that ends in `/` is a
+ * folder, opened by default, and two spaces of indent are one level.
+ */
+function toTree({ list }: { readonly list: string }): string {
+  const lines = list.split("\n").filter((line) => {
+    return line.trim() !== "";
+  });
+  const out: string[] = ["<Tree>"];
+  const open: number[] = [];
+
+  for (const line of lines) {
+    const depth = (line.length - line.trimStart().length) / 2;
+    const name = line.trim().replace(/^- /, "");
+
+    // A shallower or equal item closes the folders it is not inside of.
+    while (open.length > depth) {
+      open.pop();
+      out.push(`${"  ".repeat(open.length + 1)}</Tree.Folder>`);
+    }
+
+    const pad = "  ".repeat(depth + 1);
+
+    if (name.endsWith("/")) {
+      out.push(`${pad}<Tree.Folder name=${JSON.stringify(name.slice(0, -1))} defaultOpen>`);
+      open.push(depth);
+    } else {
+      out.push(`${pad}<Tree.File name=${JSON.stringify(name)} />`);
+    }
+  }
+
+  while (open.length > 0) {
+    open.pop();
+    out.push(`${"  ".repeat(open.length + 1)}</Tree.Folder>`);
+  }
+
+  return [...out, "</Tree>"].join("\n");
+}
+
+/**
  * Turn the README's `<!-- site:… -->` regions into blume components. On GitHub
  * the markers are invisible and the regions read as plain Markdown; MDX does
  * not parse HTML comments, so every marker has to be gone afterwards.
@@ -132,12 +171,12 @@ function toComponents({ markdown }: { readonly markdown: string }): string {
   out = out.replaceAll(
     /<!-- site:prompt (.+?) -->[\s\S]*?```text\n([\s\S]*?)```\s*<!-- \/site:prompt -->/g,
     (_match, description: string, prompt: string) => {
-      return `<Prompt description=${JSON.stringify(description)} actions={["copy", "cursor"]}>\n  {${JSON.stringify(prompt.trim())}}\n</Prompt>`;
+      return `<Prompt description=${JSON.stringify(description)} actions={["copy"]}>\n  {${JSON.stringify(prompt.trim())}}\n</Prompt>`;
     },
   );
 
   out = out.replaceAll(/<!-- site:filetree -->\n([\s\S]*?)<!-- \/site:filetree -->/g, (_match, list: string) => {
-    return `<FileTree>\n\n${list.trim()}\n\n</FileTree>`;
+    return toTree({ list });
   });
 
   // Each `### 1. Title` of the region becomes a step; the component numbers them.

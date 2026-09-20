@@ -80,4 +80,4 @@ connections   ✓ mocked 10  → allowed 0  ✗ blocked 14
 `info` changes nothing and exits 0 even when part of the setup is missing: each
 problem is listed with its fix. Known limits, such as sandbox traffic and
 clients that do not use `fetch`, are in
-[constraints](how-it-works.md#constraints).
+[Constraints](constraints.md).
