@@ -5,7 +5,7 @@ import { sample } from "openapi-sampler";
 
 import { createError, MockError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
-import { getSnapshotPath } from "./get-snapshot-path.ts";
+import { getSchemaPath } from "./get-schema-path.ts";
 import type { Mock, MockContext, PullOptions, Routes } from "./types.ts";
 
 /** A JSON object node of an OpenAPI document. */
@@ -133,19 +133,19 @@ function toResponse(result: unknown): Response {
  *
  * A request is answered by its route when one is pinned. Otherwise the spec
  * answers with the operation's lowest 2xx response: the media `example` when
- * there is one, else a sample generated from the schema. Generated samples are
+ * there is one, else a sample generated from the response schema. Generated samples are
  * smoke-test data; pin what an eval asserts on. A request that matches neither
  * answers 404, so a call the real API would reject does not pass silently.
  *
- * The OpenAPI document is the snapshot `snapshots/<mock>.openapi.json`, which
+ * The OpenAPI document is the schema file `schemas/<mock>.openapi.json`, which
  * `eve-mocks pull` downloads from `source`. It is read on the first request,
  * so processes that never call this upstream do not pay for it. A mock with
- * neither `source` nor a snapshot answers from its routes alone.
+ * neither `source` nor a schema file answers from its routes alone.
  *
  * @param input.url - Production URL prefix the paths hang off.
  * @param input.source - URL of the upstream's OpenAPI JSON.
  * @param input.pull - How `eve-mocks pull` authenticates against `source`.
- * @param input.routes - Pinned answers, path then method. With a snapshot,
+ * @param input.routes - Pinned answers, path then method. With a schema file,
  *   every route must name an operation it declares; `check` enforces it.
  */
 export function defineHttpMock({
@@ -168,7 +168,7 @@ export function defineHttpMock({
   let document: Node | undefined;
 
   /**
-   * The parsed snapshot, or an empty document for a routes-only mock.
+   * The parsed schema file, or an empty document for a routes-only mock.
    *
    * @throws MockError when the mock names a `source` that was never pulled.
    */
@@ -177,7 +177,7 @@ export function defineHttpMock({
       return document;
     }
 
-    const path = getSnapshotPath({ name, kind: "openapi" });
+    const path = getSchemaPath({ name, kind: "openapi" });
 
     if (!existsSync(path)) {
       if (source === undefined) {
@@ -186,7 +186,7 @@ export function defineHttpMock({
 
       throw createError({
         status: 404,
-        message: `No snapshot for ${name} at ${path}`,
+        message: `No schema for ${name} at ${path}`,
         why: `The mock answers from the OpenAPI document of ${source}, and it has not been pulled`,
         fix: `Run: eve-mocks pull ${name}`,
       });
@@ -213,7 +213,7 @@ export function defineHttpMock({
           status: 404,
           message: `No route or operation for ${request.method} ${path}`,
           why: "Neither the mock's routes nor its OpenAPI document declare this path",
-          fix: "Check the request against the spec, pin a route, or refresh the snapshot with eve-mocks pull",
+          fix: "Check the request against the spec, pin a route, or refresh the schema file with eve-mocks pull",
         });
       }
 
@@ -301,7 +301,7 @@ export function defineHttpMock({
           throw createError({
             status: 500,
             message: `Route ${method} ${template} matches no operation of ${url}`,
-            why: "The snapshot declares no such method and path, so the real API would reject this call",
+            why: "The schema file declares no such method and path, so the real API would reject this call",
             fix: `Did you mean ${closest}? Paths use the spec's {param} syntax and methods are upper-case`,
           });
         }
@@ -329,7 +329,7 @@ export function defineHttpMock({
           });
         }
 
-        const path = getSnapshotPath({ name, kind: "openapi" });
+        const path = getSchemaPath({ name, kind: "openapi" });
         mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, `${JSON.stringify(await response.json(), null, 2)}\n`);
 

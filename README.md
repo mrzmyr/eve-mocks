@@ -40,10 +40,10 @@ command sees it.
 
 One file per upstream at the top level of `mocks/`. Each default-exports a
 mock, an allow entry, or an array of them. The file name is the mock's name in
-`list` and in the call summary. Subfolders are ignored, so snapshots and
+`list` and in the call summary. Subfolders are ignored, so schemas and
 fixtures can live next to the mocks.
 
-**MCP server**, from a snapshot of its `tools/list` plus one result per tool:
+**MCP server**, from its pulled `tools/list` plus one result per tool:
 
 ```ts
 // mocks/tracker.ts
@@ -51,7 +51,7 @@ import { defineMcpMock } from "eve-mocks";
 
 export default defineMcpMock({
   url: "https://tracker.example.com/mcp",
-  // Snapshot tools the mock does not list, such as mutations a read-only connection never allows.
+  // Pulled tools the mock does not list, such as mutations a read-only connection never allows.
   omit: ["create_issue"],
   pull: {
     headers: async () => ({ authorization: `Bearer ${process.env.TRACKER_TOKEN}` }),
@@ -62,11 +62,11 @@ export default defineMcpMock({
 });
 ```
 
-The snapshot carries the real tool names, descriptions, and schemas. The model
+The schema file carries the real tool names, descriptions, and input schemas. The model
 reads them, so a paraphrased description makes an eval test a different prompt
 than production.
 
-**REST upstream**, from pinned routes, a snapshot of its OpenAPI document (3.0
+**REST upstream**, from pinned routes, its pulled OpenAPI document (3.0
 or 3.1), or both:
 
 ```ts
@@ -98,22 +98,22 @@ export default defineHttpMock({
   value sent as 200.
 - **Without a route**, the spec answers with the operation's lowest 2xx
   response: the media `example` when there is one, else a sample generated from
-  the schema. Generated samples are smoke-test data (`"string"`, arrays of
+  the response schema. Generated samples are smoke-test data (`"string"`, arrays of
   one); pin anything an eval asserts on.
 - **Neither** answers 404, so a call the real API would reject does not pass
   silently.
-- **Without `source` and without a snapshot**, only the routes answer.
+- **Without `source` and without a schema file**, only the routes answer.
 
-A mock file never spells a snapshot path. The file name decides it:
-`mocks/notion.ts` reads `mocks/snapshots/notion.openapi.json`, and
-`mocks/tracker.ts` reads `mocks/snapshots/tracker.tools.json`. Commit the
-snapshots: evals then run offline and without credentials, and a changed tool
+A mock file never spells a schema path. The file name decides it:
+`mocks/notion.ts` reads `mocks/schemas/notion.openapi.json`, and
+`mocks/tracker.ts` reads `mocks/schemas/tracker.tools.json`. Commit the
+schemas: evals then run offline and without credentials, and a changed tool
 description shows up as a diff instead of as an eval that fails on one machine.
 
 ## Checks before a run
 
 Before the wrapped command starts, and on `list`, every mock is checked against
-its snapshot. A mismatch stops the run with the nearest valid name:
+its schema file. A mismatch stops the run with the nearest valid name:
 
 ```
 eve-mocks: Route POST /v1/serach matches no operation of https://api.notion.com/
@@ -123,25 +123,25 @@ eve-mocks: No result for tool "list_initiatives" of https://tracker.example.com/
   fix: Add results.list_initiatives, or leave the tool out with omit: ["list_initiatives"]
 ```
 
-So a refreshed snapshot with a new tool fails the next run until someone
-writes its result. A snapshot that was never pulled stops the run too:
+So a refreshed schema file with a new tool fails the next run until someone
+writes its result. A schema file that was never pulled stops the run too:
 
 ```
-eve-mocks: No snapshot for notion at mocks/snapshots/notion.openapi.json
+eve-mocks: No schema for notion at mocks/schemas/notion.openapi.json
   why: The mock answers from the OpenAPI document of https://developers.notion.com/openapi.json, and it has not been pulled
   fix: Run: eve-mocks pull notion
 ```
 
-## Snapshots: `pull` and `add`
+## Schema files: `pull` and `add`
 
 ```sh
-eve-mocks pull            # refresh every snapshot that names a source
+eve-mocks pull            # refresh every schema file that names a source
 eve-mocks pull notion     # one mock
 eve-mocks add catalog     # scaffold mocks/catalog.ts from eve's manifest
 ```
 
 `pull` downloads a REST mock's `source`, and the real `tools/list` of an MCP
-mock's `url`, into `mocks/snapshots/`. One failing upstream does not stop the others.
+mock's `url`, into `mocks/schemas/`. One failing upstream does not stop the others.
 `pull.headers` authenticates the request and must be self-contained: read the
 environment, do not import app code. A server behind user OAuth needs a
 signed-in user's bearer token.

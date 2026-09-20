@@ -5,7 +5,7 @@
  *   eve-mocks [--dir mocks] -- <command>       run a command; upstreams mocked when
  *                                              the command carries --mocks
  *   eve-mocks list [--dir mocks]               every mock and the URL it claims
- *   eve-mocks pull [name] [--dir mocks]        refresh snapshots from the real upstreams
+ *   eve-mocks pull [name] [--dir mocks]        refresh schemas from the real upstreams
  *   eve-mocks add <name> [--dir mocks]         scaffold a mock for an eve connection
  *   eve-mocks init [--dir mocks]               mocks folder + package.json scripts
  */
@@ -80,7 +80,7 @@ function reportCalls({ log }: { readonly log: string }): void {
   console.error(`eve-mocks: call log: ${log}`);
 }
 
-/** Load the mocks and run each one's `check` against its snapshot. */
+/** Load the mocks and run each one's `check` against its schema file. */
 async function checkMocks({ dir }: { readonly dir: string }): Promise<Awaited<ReturnType<typeof loadMocks>>> {
   const loaded = await loadMocks({ dir });
 
@@ -199,7 +199,7 @@ async function list({ dir }: { readonly dir: string }): Promise<void> {
   }
 }
 
-/** Refresh the snapshot of one mock, or of every mock that names a source. */
+/** Refresh the schema file of one mock, or of every mock that names a source. */
 async function pull({ dir, name }: { readonly dir: string; readonly name: string | undefined }): Promise<void> {
   const { mocks } = await loadMocks({ dir });
   const selected = mocks.filter((entry) => {
@@ -223,7 +223,7 @@ async function pull({ dir, name }: { readonly dir: string; readonly name: string
       const path = await entry.mock.pull?.({ name: entry.name });
 
       if (path === undefined) {
-        console.log(`${entry.name.padEnd(24)}skipped: no snapshot source`);
+        console.log(`${entry.name.padEnd(24)}skipped: no schema source`);
       } else {
         console.log(`${entry.name.padEnd(24)}${path}`);
       }
@@ -249,13 +249,13 @@ function createScaffold({ name, url, protocol }: { readonly name: string; readon
 
 export default defineMcpMock({
   url: "${url}",
-  // Snapshot its tools/list with: eve-mocks pull ${name}
+  // Pull its tools/list with: eve-mocks pull ${name}
   pull: {
     headers: async () => {
       return { authorization: \`Bearer \${process.env.${name.toUpperCase().replaceAll("-", "_")}_TOKEN}\` };
     },
   },
-  // One result per snapshot tool; eve-mocks names the missing ones.
+  // One result per pulled tool; eve-mocks names the missing ones.
   results: {},
 });
 `;
@@ -376,7 +376,7 @@ const terminator = tokens.find((token) => {
 const isWrapper = terminator !== undefined && positionals.length > 0;
 const [name = "", target] = positionals;
 
-// Mock files name their snapshots relative to the mocks directory.
+// Schema files are located relative to the mocks directory.
 process.env.EVE_MOCKS_DIR = dir;
 
 try {

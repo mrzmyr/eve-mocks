@@ -1,6 +1,6 @@
 /** What eve-mocks tells a mock about itself when it calls it. */
 export type MockContext = {
-  /** The mock's file name without extension; names its snapshot. */
+  /** The mock's file name without extension; names its schema file. */
   readonly name: string;
 };
 
@@ -19,15 +19,15 @@ export type Mock = {
    */
   readonly env?: Readonly<Record<string, string>>;
   /**
-   * Checks the mock against its snapshot, such as route keys against the spec.
+   * Checks the mock against its schema file, such as route keys against the spec.
    * The CLI runs it once before a command starts; the preload does not, so the
    * processes of a run do not each pay for it.
    *
-   * @throws MockError when the mock and its snapshot disagree.
+   * @throws MockError when the mock and its schema file disagree.
    */
   readonly check?: (context: MockContext) => Promise<void>;
   /**
-   * Refreshes the mock's snapshot from the real upstream.
+   * Refreshes the mock's schema file from the real upstream.
    *
    * @returns The path written, or `undefined` when the mock names no source.
    */

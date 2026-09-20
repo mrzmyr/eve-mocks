@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 
 import { createError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
-import { getSnapshotPath } from "./get-snapshot-path.ts";
+import { getSchemaPath } from "./get-schema-path.ts";
 import type { Mock, MockContext, PullOptions, ToolResult } from "./types.ts";
 
 /** A tool as `tools/list` returns it. The model reads all three fields. */
@@ -14,11 +14,11 @@ type Tool = {
 };
 
 /**
- * Mock a hosted MCP server from a snapshot of its `tools/list` and a result
- * per tool. The snapshot is `snapshots/<mock>.tools.json`, which
+ * Mock a hosted MCP server from its pulled `tools/list` and a result per
+ * tool. The schema file is `schemas/<mock>.tools.json`, which
  * `eve-mocks pull` writes.
  *
- * The snapshot carries the real names, descriptions, and schemas, because the
+ * The file carries the real names, descriptions, and input schemas, because the
  * model reads them: a paraphrased description makes an eval test a different
  * prompt than production.
  *
@@ -28,10 +28,10 @@ type Tool = {
  * See https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#session-management
  *
  * @param input.url - Production MCP endpoint to intercept, and what
- *   `eve-mocks pull` snapshots.
+ *   `eve-mocks pull` reads the real `tools/list` from.
  * @param input.results - Answer per tool. Every served tool needs one and
- *   every key must name a snapshot tool; `check` enforces both.
- * @param input.omit - Snapshot tools the mock does not list, such as the
+ *   every key must name a pulled tool; `check` enforces both.
+ * @param input.omit - Pulled tools the mock does not list, such as the
  *   mutations a read-only connection never allows.
  * @param input.pull - How `eve-mocks pull` authenticates against `url`.
  */
@@ -46,36 +46,36 @@ export function defineMcpMock({
   readonly omit?: readonly string[];
   readonly pull?: PullOptions;
 }): Mock {
-  let snapshot: readonly Tool[] | undefined;
+  let served: readonly Tool[] | undefined;
 
   /**
-   * Snapshot tools the mock serves: all but the omitted ones.
+   * Pulled tools the mock serves: all but the omitted ones.
    *
-   * @throws MockError when the snapshot was never pulled.
+   * @throws MockError when the schema file was never pulled.
    */
   const loadTools = ({ name }: MockContext): readonly Tool[] => {
-    if (snapshot !== undefined) {
-      return snapshot;
+    if (served !== undefined) {
+      return served;
     }
 
-    const path = getSnapshotPath({ name, kind: "tools" });
+    const path = getSchemaPath({ name, kind: "tools" });
 
     if (!existsSync(path)) {
       throw createError({
         status: 404,
-        message: `No snapshot for ${name} at ${path}`,
-        why: `The mock lists the tools of ${url} from a snapshot of its tools/list, and it has not been pulled`,
+        message: `No schema for ${name} at ${path}`,
+        why: `The mock lists the tools of ${url} from its pulled tools/list, and none has been pulled`,
         fix: `Run: eve-mocks pull ${name}`,
       });
     }
 
-    snapshot = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools.filter(
+    served = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools.filter(
       (tool) => {
         return !omit.includes(tool.name);
       },
     );
 
-    return snapshot;
+    return served;
   };
 
   return {
@@ -131,7 +131,7 @@ export function defineMcpMock({
           throw createError({
             status: 500,
             message: `No result for tool "${name}" of ${url}`,
-            why: "The snapshot lists it, so the model can call it, and the mock could not answer",
+            why: "The schema file lists it, so the model can call it, and the mock could not answer",
             fix: `Add results.${name}, or leave the tool out with omit: ["${name}"]`,
           });
         }
@@ -142,8 +142,8 @@ export function defineMcpMock({
           throw createError({
             status: 500,
             message: `Result "${name}" names no tool of ${url}`,
-            why: "The snapshot lists no such tool, or omit removes it, so this result can never be called",
-            fix: `Did you mean ${getClosest({ value: name, candidates: names })}? Else refresh the snapshot with eve-mocks pull`,
+            why: "The schema file lists no such tool, or omit removes it, so this result can never be called",
+            fix: `Did you mean ${getClosest({ value: name, candidates: names })}? Else refresh the schema file with eve-mocks pull`,
           });
         }
       }
@@ -163,7 +163,7 @@ export function defineMcpMock({
         // `Transport` under `exactOptionalPropertyTypes`.
         await client.connect(transport as Parameters<typeof client.connect>[0]);
         const listed = await client.listTools();
-        const path = getSnapshotPath({ name, kind: "tools" });
+        const path = getSchemaPath({ name, kind: "tools" });
         mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, `${JSON.stringify({ tools: listed.tools }, null, 2)}\n`);
 
