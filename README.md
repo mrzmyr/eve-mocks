@@ -79,7 +79,7 @@ eve's own manifest.
 bunx eve-mocks pull linear
 ```
 
-Saves the server's real tool list (MCP) or OpenAPI document (HTTP). Run it once
+Saves the server's real tool list (MCP) or OpenAPI spec (HTTP). Run it once
 on your machine and commit the file: evals then run offline, and CI never needs
 the upstream or its credentials.
 

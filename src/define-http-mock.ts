@@ -8,7 +8,7 @@ import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getMocksDir } from "./get-mocks-dir.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
-import type { Mock, MockContext, PullHeaders, Routes } from "./types.ts";
+import type { Mock, MockContext, Routes } from "./types.ts";
 
 /** A JSON object node of an OpenAPI document. */
 type Node = { readonly [key: string]: unknown };
@@ -18,7 +18,7 @@ const METHODS = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TR
 
 /** What to try when a spec download fails; most failures are missing auth. */
 const AUTH_HINT =
-  'Check the spec URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable), or set headers in the mock file';
+  'Check the spec URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable)';
 
 /** Whether `value` is a JSON object, not an array or `null`. */
 function isNode(value: unknown): value is Node {
@@ -169,7 +169,7 @@ function isRemote({ entry }: { readonly entry: string }): boolean {
 }
 
 /**
- * Mock a REST upstream from pinned routes, its OpenAPI documents (3.0 or 3.1),
+ * Mock an HTTP API from pinned routes, its OpenAPI documents (3.0 or 3.1),
  * or both.
  *
  * A request is answered by its route when one is pinned. Otherwise the spec
@@ -189,20 +189,16 @@ function isRemote({ entry }: { readonly entry: string }): boolean {
  *   and is read in place, so the mock and the connection can share one file.
  *   An array merges the documents' operations, for several connections on one
  *   host; two documents declaring the same method and path stop the run.
- * @param input.headers - Auth for `eve-mocks pull` against a `spec` URL. Sent by
- *   `pull` only, never to a mocked request; `--header` flags add to it and win.
  * @param input.routes - Pinned answers, path then method. With a `spec`,
  *   every route must name an operation it declares; `check` enforces it.
  */
 export function defineHttpMock({
   url,
   spec,
-  headers,
   routes = {},
 }: {
   readonly url: string;
   readonly spec?: string | readonly string[];
-  readonly headers?: PullHeaders;
   readonly routes?: Routes;
 }): Mock {
   let basePath = new URL(url).pathname;
@@ -426,7 +422,7 @@ export function defineHttpMock({
           // `redirect: "error"`: a protected spec redirects to a login page, which
           // would otherwise be followed and fail later as unparseable JSON.
           const response = await fetch(file.entry, {
-            headers: { ...(await headers?.()), ...context.headers },
+            headers: context.headers,
             redirect: "error",
           });
 

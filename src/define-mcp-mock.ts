@@ -6,7 +6,7 @@ import { createError } from "./errors.ts";
 import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
-import type { Mock, MockContext, PullHeaders, ToolResult } from "./types.ts";
+import type { Mock, MockContext, ToolResult } from "./types.ts";
 
 /**
  * The official MCP inspector, run through npx at pull time. It implements the
@@ -44,18 +44,13 @@ type Tool = {
  *   mutations. Every key must name a tool of the schema file; `check`
  *   enforces it. eve filters tools by the connection's allow-list anyway, so a
  *   tool without a result is one the model could not call.
- * @param input.headers - Static auth for `eve-mocks pull`, for a server that
- *   takes a bearer token. Sent by `pull` only. A server behind OAuth needs none: the pull signs in
- *   through the browser.
  */
 export function defineMcpMock({
   url,
   results,
-  headers,
 }: {
   readonly url: string;
   readonly results: Readonly<Record<string, ToolResult>>;
-  readonly headers?: PullHeaders;
 }): Mock {
   let served: readonly Tool[] | undefined;
 
@@ -164,7 +159,7 @@ export function defineMcpMock({
     },
     pull: async (context) => {
       const { name } = context;
-      const merged = { ...(await headers?.()), ...context.headers };
+      const merged = context.headers;
       const args = ["-y", INSPECTOR, "--cli", url, "--transport", "http", "--method", "tools/list"];
 
       for (const [key, value] of Object.entries(merged)) {
@@ -201,7 +196,7 @@ export function defineMcpMock({
       });
 
       if (code !== 0) {
-        let fix = `Pass the server's auth header: eve-mocks pull ${name} --header "Authorization: Bearer <token>", or set headers in the mock file`;
+        let fix = `Pass the server's auth header: eve-mocks pull ${name} --header "Authorization: Bearer <token>"`;
 
         // The inspector's own code for "needs a browser sign-in, has no terminal".
         if (stderr.includes("auth_required")) {

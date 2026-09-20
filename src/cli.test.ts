@@ -7,7 +7,7 @@ import { join } from "node:path";
 /** An empty app root: no mocks directory, no eve manifest. */
 const EMPTY_ROOT = mkdtempSync(join(tmpdir(), "eve-mocks-cli-"));
 
-/** An app root with one REST mock and a script that makes one mocked and one blocked call. */
+/** An app root with one HTTP mock and a script that makes one mocked and one blocked call. */
 const APP_ROOT = mkdtempSync(join(tmpdir(), "eve-mocks-cli-app-"));
 
 mkdirSync(join(APP_ROOT, "mocks"));

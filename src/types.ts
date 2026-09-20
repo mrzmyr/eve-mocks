@@ -41,17 +41,9 @@ export type Mock = {
 
 /** What `eve-mocks pull` tells a mock. */
 export type PullContext = MockContext & {
-  /** Headers from `--header` flags. They win over the mock's `headers`. */
+  /** Headers from `--header` flags, such as auth for a protected upstream. */
   readonly headers: Readonly<Record<string, string>>;
 };
-
-/**
- * Request headers `eve-mocks pull` sends to the real upstream, such as auth.
- * Only `pull` calls it; a mocked request never sees these. Must be
- * self-contained: read the environment, do not import app code. Mock files load
- * under Node type stripping, which cannot resolve an app's extensionless imports.
- */
-export type PullHeaders = () => Promise<Record<string, string>>;
 
 /** What a route handler receives. */
 export type RouteContext = {

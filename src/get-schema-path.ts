@@ -11,7 +11,7 @@ const SCHEMAS_DIR = "schemas";
  * `pull`, `check`, and the preload agree on it in every process.
  *
  * @param input.name - The mock's file name without extension.
- * @param input.kind - `openapi` for a REST spec, `tools` for an MCP `tools/list`.
+ * @param input.kind - `openapi` for an HTTP API's OpenAPI document, `tools` for an MCP `tools/list`.
  * @throws MockError when `EVE_MOCKS_DIR` is unset, which only the eve-mocks
  *   CLI and its wrapper set.
  */

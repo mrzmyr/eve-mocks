@@ -33,7 +33,7 @@ defineHttpMock({ url: "https://billing.example.com", spec: "../openapi/billing.j
 
 eve accepts only modules inside `lib/`, so keep the `.json` file outside it.
 
-### An upstream has no OpenAPI document. Can I still mock it?
+### An upstream has no OpenAPI spec. Can I still mock it?
 
 Yes. Leave `spec` out and only the routes answer; everything else is a 404.
 

@@ -33,7 +33,7 @@ export default defineMcpMock({
 
 ## HTTP
 
-Point `spec` at the upstream's OpenAPI document and pin the routes your evals
+Point `spec` at the upstream's OpenAPI spec and pin the routes your evals
 assert on. The spec answers everything else.
 
 ```ts
@@ -92,33 +92,13 @@ need a credential. It runs on your machine, never in CI.
 | The upstream | Do this |
 | --- | --- |
 | MCP server with OAuth | Nothing. The first pull opens the browser, later pulls reuse the token. |
-| needs a static token | `bunx eve-mocks pull events --header "Authorization: Bearer $TOKEN"` |
-| token should stay out of the command line | give the mock `headers`, below |
+| needs a token or an API key | pass it with `--header` |
 
-```ts
-defineHttpMock({
-  url: "https://events.example.com/",
-  spec: "https://events.example.com/openapi.json",
-  headers: async () => ({ "x-api-key": process.env.EVENTS_API_KEY ?? "" }),
-});
+```sh
+bunx eve-mocks pull events --header "Authorization: Bearer $TOKEN"
 ```
 
-`headers` is sent by `pull` only, never to a mocked request. `--header` needs
-the mock's name, so a token goes to one upstream and never to all of them.
-
-## Checks
-
-Every mock is checked against its schema before the agent starts, so a typo
-stops the run with the nearest valid name:
-
-```
-eve-mocks: Result "get_isue" names no tool of https://mcp.linear.app/mcp
-  fix: Did you mean get_issue? Else refresh the schema file with eve-mocks pull linear
-```
-
-```
-eve-mocks: Route POST /v1/serach matches no operation of https://api.notion.com/
-  fix: Did you mean POST /v1/search? Paths use the spec's {param} syntax and methods are upper-case
-```
+`--header` is repeatable and needs the mock's name, so a credential goes to one
+upstream and never to all of them. It is not stored anywhere.
 
 Local spec files, several specs on one host, and more: [FAQ](faq.md).
