@@ -1,10 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { sample } from "openapi-sampler";
 
 import { createError, MockError } from "./errors.ts";
+import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
+import { getMocksDir } from "./get-mocks-dir.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
 import type { Mock, MockContext, PullHeaders, Routes } from "./types.ts";
 
@@ -16,7 +18,7 @@ const METHODS = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TR
 
 /** What to try when a spec download fails; most failures are missing auth. */
 const AUTH_HINT =
-  'Check the source URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable), or set headers in the mock file';
+  'Check the spec URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable), or set headers in the mock file';
 
 /** Whether `value` is a JSON object, not an array or `null`. */
 function isNode(value: unknown): value is Node {
@@ -131,8 +133,43 @@ function toResponse(result: unknown): Response {
   return Response.json(result);
 }
 
+/** One entry of a mock's `spec`, located. */
+type SpecFile = {
+  /** The entry as the mock file spells it: a URL or a local path. */
+  readonly entry: string;
+  /** File the document is read from: the pulled schema file, or the local spec itself. */
+  readonly path: string;
+  /** Whether `entry` is a URL, which `eve-mocks pull` downloads to `path`. */
+  readonly isRemote: boolean;
+};
+
 /**
- * Mock a REST upstream from pinned routes, its OpenAPI document (3.0 or 3.1),
+ * An operation with the document that declares it. Documents of a merged
+ * `spec` keep their own `components`, so a `$ref` is resolved where it was written.
+ */
+type Operation = {
+  /** The OpenAPI operation object. */
+  readonly node: Node;
+  /** The document `node` comes from. */
+  readonly document: Node;
+};
+
+/** Operations of every document of a mock, path template then upper-case method. */
+type Operations = Readonly<Record<string, Readonly<Record<string, Operation>>>>;
+
+/** Whether a `spec` entry is a URL to pull, not a local path. */
+function isRemote({ entry }: { readonly entry: string }): boolean {
+  if (!URL.canParse(entry)) {
+    return false;
+  }
+
+  const { protocol } = new URL(entry);
+
+  return protocol === "https:" || protocol === "http:";
+}
+
+/**
+ * Mock a REST upstream from pinned routes, its OpenAPI documents (3.0 or 3.1),
  * or both.
  *
  * A request is answered by its route when one is pinned. Otherwise the spec
@@ -141,26 +178,30 @@ function toResponse(result: unknown): Response {
  * smoke-test data; pin what an eval asserts on. A request that matches neither
  * answers 404, so a call the real API would reject does not pass silently.
  *
- * The OpenAPI document is the schema file `schemas/<mock>.openapi.json`, which
- * `eve-mocks pull` downloads from `source`. It is read on the first request,
- * so processes that never call this upstream do not pay for it. A mock with
- * neither `source` nor a schema file answers from its routes alone.
+ * Documents are read on the first request, so processes that never call this
+ * upstream do not pay for them. A mock without `spec` answers from its routes alone.
  *
  * @param input.url - Production URL prefix the paths hang off.
- * @param input.source - URL of the upstream's OpenAPI JSON.
- * @param input.headers - Auth for `eve-mocks pull` against `source`. Sent by
+ * @param input.spec - The upstream's OpenAPI JSON: a URL, a local path, or an
+ *   array of them. A URL is downloaded by `eve-mocks pull` into
+ *   `schemas/<mock>.openapi.json`, or `schemas/<mock>.<position>.openapi.json`
+ *   when `spec` is an array. A local path resolves against the mocks directory
+ *   and is read in place, so the mock and the connection can share one file.
+ *   An array merges the documents' operations, for several connections on one
+ *   host; two documents declaring the same method and path stop the run.
+ * @param input.headers - Auth for `eve-mocks pull` against a `spec` URL. Sent by
  *   `pull` only, never to a mocked request; `--header` flags add to it and win.
- * @param input.routes - Pinned answers, path then method. With a schema file,
+ * @param input.routes - Pinned answers, path then method. With a `spec`,
  *   every route must name an operation it declares; `check` enforces it.
  */
 export function defineHttpMock({
   url,
-  source,
+  spec,
   headers,
   routes = {},
 }: {
   readonly url: string;
-  readonly source?: string;
+  readonly spec?: string | readonly string[];
   readonly headers?: PullHeaders;
   readonly routes?: Routes;
 }): Mock {
@@ -170,46 +211,109 @@ export function defineHttpMock({
     basePath = basePath.slice(0, -1);
   }
 
-  let document: Node | undefined;
-
-  /**
-   * The parsed schema file, or an empty document for a routes-only mock.
-   *
-   * @throws MockError when the mock names a `source` that was never pulled.
-   */
-  const loadSpec = ({ name }: MockContext): Node => {
-    if (document !== undefined) {
-      return document;
+  const locate = ({ name }: MockContext): SpecFile[] => {
+    if (spec === undefined) {
+      return [];
     }
 
-    const path = getSchemaPath({ name, kind: "openapi" });
-
-    if (!existsSync(path)) {
-      if (source === undefined) {
-        return {};
+    if (typeof spec === "string") {
+      if (isRemote({ entry: spec })) {
+        return [{ entry: spec, path: getSchemaPath({ name, kind: "openapi" }), isRemote: true }];
       }
 
-      throw createError({
-        status: 404,
-        message: `No schema for ${name} at ${path}`,
-        why: `The mock answers from the OpenAPI document of ${source}, and it has not been pulled`,
-        fix: `Run: eve-mocks pull ${name}`,
-      });
+      return [{ entry: spec, path: resolve(getMocksDir({ name }), spec), isRemote: false }];
     }
 
-    document = JSON.parse(readFileSync(path, "utf8")) as Node;
+    return spec.map((entry, index) => {
+      if (isRemote({ entry })) {
+        return {
+          entry,
+          path: getSchemaPath({ name: `${name}.${index + 1}`, kind: "openapi" }),
+          isRemote: true,
+        };
+      }
 
-    return document;
+      return { entry, path: resolve(getMocksDir({ name }), entry), isRemote: false };
+    });
+  };
+
+  let operations: Operations | undefined;
+
+  /**
+   * Operations of every `spec` document, or none for a routes-only mock.
+   *
+   * @throws MockError when a document is missing, or when two documents
+   *   declare the same method and path.
+   */
+  const loadSpec = (context: MockContext): Operations => {
+    if (operations !== undefined) {
+      return operations;
+    }
+
+    const { name } = context;
+    const merged: Record<string, Record<string, Operation>> = {};
+    const owners: Record<string, string> = {};
+
+    for (const file of locate(context)) {
+      if (!existsSync(file.path)) {
+        if (file.isRemote) {
+          throw createError({
+            status: 404,
+            message: `No schema for ${name} at ${file.path}`,
+            why: `The mock answers from the OpenAPI document of ${file.entry}, and it has not been pulled`,
+            fix: `Run: eve-mocks pull ${name}`,
+          });
+        }
+
+        throw createError({
+          status: 404,
+          message: `No spec for ${name} at ${file.path}`,
+          why: `The mock names the local spec "${file.entry}", and no file is there`,
+          fix: "Check the path; a local spec resolves against the mocks directory",
+        });
+      }
+
+      const document = getNode(
+        readJson({ path: file.path, fix: "Pull the spec again with eve-mocks pull, or fix the local spec file" }),
+      );
+
+      for (const [template, item] of Object.entries(getNode(document.paths))) {
+        for (const method of METHODS) {
+          const node = getNode(item)[method.toLowerCase()];
+
+          if (!isNode(node)) {
+            continue;
+          }
+
+          const key = `${method} ${template}`;
+
+          if (owners[key] !== undefined) {
+            throw createError({
+              status: 500,
+              message: `${key} is declared by two specs of ${name}`,
+              why: `Both "${owners[key]}" and "${file.entry}" declare it, so the mock cannot tell which answer to give`,
+              fix: "Remove the operation from one spec, or pin the route so neither spec answers it",
+            });
+          }
+
+          owners[key] = file.entry;
+          merged[template] = { ...merged[template], [method]: { node, document } };
+        }
+      }
+    }
+
+    operations = merged;
+
+    return operations;
   };
 
   return {
     url,
     handle: async (request, context) => {
       const loaded = loadSpec(context);
-      const paths = getNode(loaded.paths);
       const path = new URL(request.url).pathname.slice(basePath.length);
       const match = matchTemplate({
-        templates: [...new Set([...Object.keys(routes), ...Object.keys(paths)])],
+        templates: [...new Set([...Object.keys(routes), ...Object.keys(loaded)])],
         path,
       });
 
@@ -217,8 +321,8 @@ export function defineHttpMock({
         return respondError({
           status: 404,
           message: `No route or operation for ${request.method} ${path}`,
-          why: "Neither the mock's routes nor its OpenAPI document declare this path",
-          fix: "Check the request against the spec, pin a route, or refresh the schema file with eve-mocks pull",
+          why: "Neither the mock's routes nor its OpenAPI documents declare this path",
+          fix: "Check the request against the spec, pin a route, or refresh a pulled spec with eve-mocks pull",
         });
       }
 
@@ -229,18 +333,19 @@ export function defineHttpMock({
         return toResponse(await handler({ request, params }));
       }
 
-      const operation = getNode(paths[template])[request.method.toLowerCase()];
+      const operation = loaded[template]?.[request.method];
 
-      if (!METHODS.includes(request.method) || !isNode(operation)) {
+      if (operation === undefined) {
         return respondError({
           status: 404,
           message: `No route or operation for ${request.method} ${template}`,
-          why: "The path exists, but neither the routes nor the OpenAPI document declare this method on it",
+          why: "The path exists, but neither the routes nor the OpenAPI documents declare this method on it",
           fix: "Check the request against the spec, or pin the route",
         });
       }
 
-      const responses = getNode(operation.responses);
+      const { node, document } = operation;
+      const responses = getNode(node.responses);
       const code = Object.keys(responses)
         .filter((key) => {
           const status = Number(key);
@@ -260,10 +365,10 @@ export function defineHttpMock({
         });
       }
 
-      const response = resolveRef({ node: responses[code], spec: loaded });
+      const response = resolveRef({ node: responses[code], spec: document });
       const media = resolveRef({
         node: getNode(getNode(response).content)["application/json"],
-        spec: loaded,
+        spec: document,
       });
 
       if (!isNode(media)) {
@@ -274,7 +379,7 @@ export function defineHttpMock({
         return Response.json(media.example, { status: Number(code) });
       }
 
-      return Response.json(sample(getNode(media.schema), { quiet: true }, loaded), {
+      return Response.json(sample(getNode(media.schema), { quiet: true }, document), {
         status: Number(code),
       });
     },
@@ -282,78 +387,76 @@ export function defineHttpMock({
       const loaded = loadSpec(context);
 
       // Routes-only mock: nothing to hold the routes against.
-      if (loaded.paths === undefined) {
+      if (spec === undefined) {
         return;
       }
 
-      const paths = getNode(loaded.paths);
-
       for (const [template, handlers] of Object.entries(routes)) {
         for (const method of Object.keys(handlers)) {
-          if (isNode(getNode(paths[template])[method.toLowerCase()]) && METHODS.includes(method)) {
+          if (loaded[template]?.[method] !== undefined) {
             continue;
           }
 
-          const operations = Object.entries(paths).flatMap(([candidate, item]) => {
-            return METHODS.filter((entry) => {
-              return isNode(getNode(item)[entry.toLowerCase()]);
-            }).map((entry) => {
+          const declared = Object.entries(loaded).flatMap(([candidate, methods]) => {
+            return Object.keys(methods).map((entry) => {
               return `${entry} ${candidate}`;
             });
           });
-          const closest = getClosest({ value: `${method} ${template}`, candidates: operations });
+          const closest = getClosest({ value: `${method} ${template}`, candidates: declared });
 
           throw createError({
             status: 500,
             message: `Route ${method} ${template} matches no operation of ${url}`,
-            why: "The schema file declares no such method and path, so the real API would reject this call",
+            why: "The spec declares no such method and path, so the real API would reject this call",
             fix: `Did you mean ${closest}? Paths use the spec's {param} syntax and methods are upper-case`,
           });
         }
       }
     },
     pull: async (context) => {
-      const { name } = context;
+      const written: string[] = [];
 
-      if (source === undefined) {
-        return undefined;
-      }
+      for (const file of locate(context)) {
+        if (!file.isRemote) {
+          continue;
+        }
 
-      try {
-        // `redirect: "error"`: a protected spec redirects to a login page, which
-        // would otherwise be followed and fail later as unparseable JSON.
-        const response = await fetch(source, {
-          headers: { ...(await headers?.()), ...context.headers },
-          redirect: "error",
-        });
+        try {
+          // `redirect: "error"`: a protected spec redirects to a login page, which
+          // would otherwise be followed and fail later as unparseable JSON.
+          const response = await fetch(file.entry, {
+            headers: { ...(await headers?.()), ...context.headers },
+            redirect: "error",
+          });
 
-        if (!response.ok) {
+          if (!response.ok) {
+            throw createError({
+              status: 502,
+              message: `OpenAPI spec download failed for ${file.entry}`,
+              why: `The server answered ${response.status}`,
+              fix: AUTH_HINT,
+            });
+          }
+
+          mkdirSync(dirname(file.path), { recursive: true });
+          writeFileSync(file.path, `${JSON.stringify(await response.json(), null, 2)}\n`);
+          written.push(file.path);
+        } catch (cause) {
+          if (cause instanceof MockError) {
+            throw cause;
+          }
+
           throw createError({
             status: 502,
-            message: `OpenAPI spec download failed for ${source}`,
-            why: `The server answered ${response.status}`,
+            message: `OpenAPI spec download failed for ${file.entry}`,
+            why: "The server answered with a redirect, non-JSON body, or another fetch error; a protected spec redirects to its login page",
             fix: AUTH_HINT,
+            cause,
           });
         }
-
-        const path = getSchemaPath({ name, kind: "openapi" });
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, `${JSON.stringify(await response.json(), null, 2)}\n`);
-
-        return path;
-      } catch (cause) {
-        if (cause instanceof MockError) {
-          throw cause;
-        }
-
-        throw createError({
-          status: 502,
-          message: `OpenAPI spec download failed for ${source}`,
-          why: "The server answered with a redirect, non-JSON body, or another fetch error; a protected spec redirects to its login page",
-          fix: AUTH_HINT,
-          cause,
-        });
       }
+
+      return written;
     },
   };
 }

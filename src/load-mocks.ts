@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { createError } from "./errors.ts";
+import { createError, MockError } from "./errors.ts";
 import type { Allowed, Mock } from "./types.ts";
 
 /** A mock with the name of the file that defines it. */
@@ -81,9 +81,30 @@ export async function loadMocks({ dir }: { readonly dir: string }): Promise<Load
       continue;
     }
 
-    const module = (await import(pathToFileURL(join(dir, entry.name)).href)) as {
-      readonly default?: unknown;
-    };
+    let module: { readonly default?: unknown };
+
+    try {
+      module = (await import(pathToFileURL(join(dir, entry.name)).href)) as { readonly default?: unknown };
+    } catch (cause) {
+      // An error a mock raised on purpose, such as a bad option, already says what to do.
+      if (cause instanceof MockError) {
+        throw cause;
+      }
+
+      let why = String(cause);
+
+      if (cause instanceof Error) {
+        why = cause.message;
+      }
+
+      throw createError({
+        status: 422,
+        message: `Cannot load mock file ${entry.name}`,
+        why,
+        fix: "Fix the error in the file. Relative imports need the .ts extension, and a mock file cannot import app code that uses extensionless imports",
+        cause,
+      });
+    }
     const entries = [module.default].flat();
     const isValid = entries.every((entry) => {
       return isMock(entry) || isAllowed(entry);

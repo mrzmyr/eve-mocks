@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { createError } from "./errors.ts";
+import { readJson } from "./read-json.ts";
 
 /** A connection the eve app declares, as its compiled manifest lists it. */
 export type Connection = {
@@ -14,10 +15,12 @@ export type Connection = {
   readonly url?: string;
   /** `openapi` or `mcp`. Absent for a dynamic connection. */
   readonly protocol?: string;
+  /** Absolute path of the module that defines a dynamic connection. */
+  readonly path?: string;
 };
 
 /** Where eve writes the manifest, relative to the app root. See https://eve.dev/docs/reference/cli */
-const MANIFEST_PATH = ".eve/compile/compiled-agent-manifest.json";
+export const MANIFEST_PATH = ".eve/compile/compiled-agent-manifest.json";
 
 /**
  * Manifest schema version this reader was written against. eve documents the
@@ -49,11 +52,16 @@ function createShapeError({ detail, version }: { readonly detail: string; readon
 
 /** Connections of one agent node and, recursively, of its subagents. */
 function collect({ agent, version }: { readonly agent: Node; readonly version: unknown }): Connection[] {
-  const { connections, dynamicConnections, subagents = [] } = agent;
+  const { agentRoot, connections, dynamicConnections, subagents = [] } = agent;
 
-  if (!Array.isArray(connections) || !Array.isArray(dynamicConnections) || !Array.isArray(subagents)) {
+  if (
+    typeof agentRoot !== "string" ||
+    !Array.isArray(connections) ||
+    !Array.isArray(dynamicConnections) ||
+    !Array.isArray(subagents)
+  ) {
     throw createShapeError({
-      detail: "An agent lacks the connections, dynamicConnections, or subagents array",
+      detail: "An agent lacks agentRoot, or the connections, dynamicConnections, or subagents array",
       version,
     });
   }
@@ -74,11 +82,12 @@ function collect({ agent, version }: { readonly agent: Node; readonly version: u
   }
 
   for (const entry of dynamicConnections) {
-    if (!isNode(entry) || typeof entry.slug !== "string") {
-      throw createShapeError({ detail: "A dynamic connection lacks slug", version });
+    if (!isNode(entry) || typeof entry.slug !== "string" || typeof entry.logicalPath !== "string") {
+      throw createShapeError({ detail: "A dynamic connection lacks slug or logicalPath", version });
     }
 
-    found.push({ name: entry.slug });
+    // `logicalPath` is relative to the agent that owns the connection, not to the app.
+    found.push({ name: entry.slug, path: join(agentRoot, entry.logicalPath) });
   }
 
   for (const entry of subagents) {
@@ -93,7 +102,8 @@ function collect({ agent, version }: { readonly agent: Node; readonly version: u
 }
 
 /**
- * Every connection of the eve app and its subagents, deduplicated.
+ * Every connection of the eve app and its subagents. Subagents repeat
+ * connections; `resolveConnections` deduplicates once URLs are known.
  *
  * @param input.root - App root, where `.eve/` lives.
  * @throws MockError 404 when eve has not compiled the app yet, 500 when the
@@ -111,7 +121,7 @@ export function readManifest({ root }: { readonly root: string }): Connection[] 
     });
   }
 
-  const manifest: unknown = JSON.parse(readFileSync(path, "utf8"));
+  const manifest = readJson({ path, fix: "Recompile the app with `eve info`, then rerun" });
 
   if (!isNode(manifest) || manifest.kind !== "eve-agent-compiled-manifest") {
     throw createShapeError({ detail: "The file is not an eve-agent-compiled-manifest", version: undefined });
@@ -126,16 +136,5 @@ export function readManifest({ root }: { readonly root: string }): Connection[] 
     );
   }
 
-  const seen = new Set<string>();
-
-  return connections.filter(({ name, url }) => {
-    const key = `${name} ${url}`;
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
+  return connections;
 }

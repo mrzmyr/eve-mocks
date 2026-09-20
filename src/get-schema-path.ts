@@ -1,12 +1,12 @@
 import { join } from "node:path";
 
-import { createError } from "./errors.ts";
+import { getMocksDir } from "./get-mocks-dir.ts";
 
 /** Folder inside the mocks directory that holds what `eve-mocks pull` writes. */
 const SCHEMAS_DIR = "schemas";
 
 /**
- * Where a mock's schema lives: `<mocks>/schemas/<name>.<kind>.json`.
+ * Where a pulled schema lives: `<mocks>/schemas/<name>.<kind>.json`.
  * Derived from the mock's file name, so a mock file never spells a path and
  * `pull`, `check`, and the preload agree on it in every process.
  *
@@ -22,16 +22,5 @@ export function getSchemaPath({
   readonly name: string;
   readonly kind: "openapi" | "tools";
 }): string {
-  const { EVE_MOCKS_DIR } = process.env;
-
-  if (EVE_MOCKS_DIR === undefined) {
-    throw createError({
-      status: 500,
-      message: `Cannot locate the schema of ${name}`,
-      why: "Schemas live in the mocks directory, and EVE_MOCKS_DIR is not set",
-      fix: "Load the mock through the eve-mocks CLI or its wrapper",
-    });
-  }
-
-  return join(EVE_MOCKS_DIR, SCHEMAS_DIR, `${name}.${kind}.json`);
+  return join(getMocksDir({ name }), SCHEMAS_DIR, `${name}.${kind}.json`);
 }

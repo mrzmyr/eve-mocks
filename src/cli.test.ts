@@ -1,0 +1,163 @@
+import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+/** An empty app root: no mocks directory, no eve manifest. */
+const EMPTY_ROOT = mkdtempSync(join(tmpdir(), "eve-mocks-cli-"));
+
+/** An app root with one REST mock and a script that makes one mocked and one blocked call. */
+const APP_ROOT = mkdtempSync(join(tmpdir(), "eve-mocks-cli-app-"));
+
+mkdirSync(join(APP_ROOT, "mocks"));
+writeFileSync(
+  join(APP_ROOT, "mocks/shop.ts"),
+  `import { defineHttpMock } from ${JSON.stringify(join(import.meta.dir, "index.ts"))};
+   export default defineHttpMock({ url: "https://shop.example.com/", routes: { "/mcp": { POST: () => ({ ok: true }) } } });`,
+);
+writeFileSync(
+  join(APP_ROOT, "agent.mjs"),
+  `await fetch("https://shop.example.com/mcp", {
+     method: "POST",
+     headers: { "content-type": "application/json" },
+     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_order" } }),
+   });
+   // Like a model that recovers from a failed tool call.
+   if (process.argv.includes("--stray")) { await fetch("https://stray.example.com/").catch(() => {}); }`,
+);
+
+// One line per Node HTTP module: BLOCKED when the guard threw, else REACHED.
+writeFileSync(
+  join(APP_ROOT, "legacy.mjs"),
+  `import http from "node:http";
+   import { get } from "node:https";
+   import { connect } from "node:http2";
+   const attempt = (label, call) => {
+     try { call(); console.log(label, "REACHED"); } catch (error) { console.log(label, "BLOCKED", error.message.split("\\n")[0]); }
+   };
+   attempt("https-named-import", () => get("https://stray.example.com/x").on("error", () => {}).destroy());
+   attempt("http-options", () => http.request({ hostname: "stray.example.com", path: "/y", method: "post" }).on("error", () => {}).destroy());
+   attempt("http2", () => connect("https://stray.example.com").on("error", () => {}).destroy());
+   attempt("mocked-host", () => get("https://shop.example.com/mcp").on("error", () => {}).destroy());
+   attempt("loopback", () => http.get("http://127.0.0.1:9/").on("error", () => {}).destroy());`,
+);
+
+/** Run the CLI on Node, as its shebang does; in an empty app root unless `cwd` names another. */
+function run({ args, cwd = EMPTY_ROOT }: { readonly args: readonly string[]; readonly cwd?: string }) {
+  return spawnSync("node", [join(import.meta.dir, "cli.ts"), ...args], { cwd, encoding: "utf8" });
+}
+
+describe("cli", () => {
+  test("prints the overview without arguments and for --help", () => {
+    const bare = run({ args: [] });
+
+    expect(bare.status).toBe(0);
+    expect(bare.stdout).toContain("Exit codes");
+    expect(run({ args: ["-h"] }).stdout).toBe(bare.stdout);
+  });
+
+  test("prints the help of one command for <command> -h and help <command>", () => {
+    const flag = run({ args: ["pull", "-h"] });
+
+    expect(flag.stdout).toStartWith("eve-mocks pull");
+    expect(run({ args: ["help", "pull"] }).stdout).toBe(flag.stdout);
+  });
+
+  test("prints the version", () => {
+    expect(run({ args: ["--version"] }).stdout.trim()).toBe("0.0.0");
+  });
+
+  test("exits 2 for an unknown command and hints at the nearest one", () => {
+    const { status, stderr, stdout } = run({ args: ["lst"] });
+
+    expect(status).toBe(2);
+    expect(stderr).toContain('Did you mean "list"?');
+    expect(stdout).toBe("");
+  });
+
+  test("exits 2 for an unknown option, as JSON on stderr under --json", () => {
+    const { status, stderr, stdout } = run({ args: ["list", "--nope", "--json"] });
+
+    expect(status).toBe(2);
+    expect(JSON.parse(stderr).error.status).toBe(400);
+    expect(stdout).toBe("");
+  });
+
+  test("info exits 0 on a broken setup and names each problem", () => {
+    const { status, stdout } = run({ args: ["info", "--json"] });
+    const { problems, counts } = JSON.parse(stdout);
+
+    expect(status).toBe(0);
+    expect(problems).toHaveLength(2);
+    expect(counts).toEqual({ mocked: 0, allowed: 0, blocked: 0 });
+  });
+
+  test("leaves the flags after -- to the wrapped command and passes its exit code on", () => {
+    const { status, stdout } = run({
+      args: ["--", "node", "-p", "process.exit(7)", "--", "-h", "--json"],
+    });
+
+    expect(status).toBe(7);
+    expect(stdout).toBe("");
+  });
+
+  test("fails a run whose command succeeded but made a blocked call", () => {
+    const { status, stderr } = run({ args: ["--", "node", "agent.mjs", "--stray", "--mocks"], cwd: APP_ROOT });
+
+    expect(status).toBe(1);
+    expect(stderr).toContain("The run made blocked calls: 1");
+  });
+
+  test("lets that run pass with --no-fail-on-blocked, in the command or before --", () => {
+    const inCommand = ["--", "node", "agent.mjs", "--stray", "--mocks", "--no-fail-on-blocked"];
+    const before = ["--no-fail-on-blocked", "--", "node", "agent.mjs", "--stray", "--mocks"];
+
+    expect(run({ args: inCommand, cwd: APP_ROOT }).status).toBe(0);
+    expect(run({ args: before, cwd: APP_ROOT }).status).toBe(0);
+  });
+
+  test("writes the latest run to .eve-mocks/report.json, with MCP tool names, and ignores the folder in git", () => {
+    expect(run({ args: ["--", "node", "agent.mjs", "--mocks"], cwd: APP_ROOT }).status).toBe(0);
+
+    const report = JSON.parse(readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8"));
+
+    expect(report.counts).toEqual({ mocked: 1, allowed: 0, blocked: 0 });
+    expect(report.targets).toEqual([{ outcome: "mocked", target: "shop", calls: 1, tools: { get_order: 1 } }]);
+    expect(readFileSync(join(APP_ROOT, ".eve-mocks/.gitignore"), "utf8")).toBe("*\n");
+  });
+
+  test("exits 127 with a fix when the wrapped command is not installed", () => {
+    const { status, stderr } = run({ args: ["--", "no-such-command-eve-mocks"] });
+
+    expect(status).toBe(127);
+    expect(stderr).toContain("fix:");
+  });
+
+  test("refuses pull --header without a mock name, so a token goes to one upstream only", () => {
+    const { status, stderr } = run({ args: ["pull", "--header", "Authorization: Bearer x"], cwd: APP_ROOT });
+
+    expect(status).toBe(2);
+    expect(stderr).toContain("pull --header needs a mock name");
+  });
+
+  for (const runtime of ["node", "bun"]) {
+    test(`blocks node:http, node:https, and node:http2 under ${runtime}, and counts them as blocked`, () => {
+      const { status, stdout } = run({ args: ["--", runtime, "legacy.mjs", "--mocks"], cwd: APP_ROOT });
+      const lines = stdout.trim().split("\n");
+
+      expect(lines).toEqual([
+        "https-named-import BLOCKED stray.example.com is neither mocked nor allowed",
+        "http-options BLOCKED stray.example.com is neither mocked nor allowed",
+        "http2 BLOCKED stray.example.com is neither mocked nor allowed",
+        "mocked-host BLOCKED shop.example.com is neither mocked nor allowed",
+        "loopback REACHED",
+      ]);
+      expect(status).toBe(1);
+
+      const report = JSON.parse(readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8"));
+
+      expect(report.counts.blocked).toBe(4);
+    });
+  }
+});

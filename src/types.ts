@@ -27,11 +27,11 @@ export type Mock = {
    */
   readonly check?: (context: MockContext) => Promise<void>;
   /**
-   * Refreshes the mock's schema file from the real upstream.
+   * Refreshes the mock's schema files from the real upstream.
    *
-   * @returns The path written, or `undefined` when the mock names no source.
+   * @returns The paths written; none when the mock has nothing remote to pull.
    */
-  readonly pull?: (context: PullContext) => Promise<string | undefined>;
+  readonly pull?: (context: PullContext) => Promise<readonly string[]>;
 };
 
 /** What `eve-mocks pull` tells a mock. */
@@ -85,6 +85,8 @@ export type CallRecord = {
   readonly outcome: "mocked" | "allowed" | "blocked";
   /** Mock file name for a mocked call, else the host that was called. */
   readonly target: string;
+  /** Tool an MCP `tools/call` named. Absent for every other request. */
+  readonly tool?: string;
   /** HTTP method of the intercepted request. */
   readonly method: string;
   /** Production URL the agent asked for. */

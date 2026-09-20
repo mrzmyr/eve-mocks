@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { createError } from "./errors.ts";
+import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
 import type { Mock, MockContext, PullHeaders, ToolResult } from "./types.ts";
@@ -79,7 +80,7 @@ export function defineMcpMock({
       });
     }
 
-    served = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools.filter(
+    served = (readJson({ path, fix: `Pull it again: eve-mocks pull ${name}` }) as { readonly tools: Tool[] }).tools.filter(
       (tool) => {
         return results[tool.name] !== undefined;
       },
@@ -142,7 +143,9 @@ export function defineMcpMock({
         }
 
         const path = getSchemaPath({ name: context.name, kind: "tools" });
-        const all = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools;
+        const all = (
+          readJson({ path, fix: `Pull it again: eve-mocks pull ${context.name}` }) as { readonly tools: Tool[] }
+        ).tools;
         const closest = getClosest({
           value: name,
           candidates: all.map((tool) => {
@@ -181,8 +184,19 @@ export function defineMcpMock({
         process.stderr.write(chunk);
       });
 
-      const code = await new Promise<number | null>((resolve) => {
+      const code = await new Promise<number | null>((resolve, reject) => {
         child.on("close", resolve);
+        child.on("error", (cause) => {
+          reject(
+            createError({
+              status: 500,
+              message: `tools/list failed for ${url}`,
+              why: `npx, which runs the MCP inspector, could not start: ${cause.message}`,
+              fix: "Install Node.js with npm, so that npx is on the PATH",
+              cause,
+            }),
+          );
+        });
       });
 
       if (code !== 0) {
@@ -202,11 +216,24 @@ export function defineMcpMock({
       }
 
       const path = getSchemaPath({ name, kind: "tools" });
-      const listed = JSON.parse(stdout) as { readonly tools: readonly Tool[] };
+      let listed: { readonly tools: readonly Tool[] };
+
+      try {
+        listed = JSON.parse(stdout) as { readonly tools: readonly Tool[] };
+      } catch (cause) {
+        throw createError({
+          status: 502,
+          message: `tools/list failed for ${url}`,
+          why: "The MCP inspector exited with 0 but printed something other than JSON; its output is above",
+          fix: "Run the pull again; if it repeats, the inspector changed its output and eve-mocks needs an update",
+          cause,
+        });
+      }
+
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, `${JSON.stringify({ tools: listed.tools }, null, 2)}\n`);
 
-      return path;
+      return [path];
     },
   };
 }

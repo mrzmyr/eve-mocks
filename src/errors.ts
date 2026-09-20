@@ -18,6 +18,8 @@ export type MockErrorInput = {
 export class MockError extends Error {
   /** HTTP-style status code. */
   readonly status: number;
+  /** What went wrong, without the `why` and `fix` lines that `message` carries. */
+  readonly summary: string;
   /** Why it went wrong. */
   readonly why: string;
   /** How to resolve it. */
@@ -32,6 +34,7 @@ export class MockError extends Error {
     super(`${message}\n  why: ${why}\n  fix: ${fix}`, { cause });
     this.name = "MockError";
     this.status = status;
+    this.summary = message;
     this.why = why;
     this.fix = fix;
 

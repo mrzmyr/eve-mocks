@@ -1,49 +1,42 @@
 # eve-mocks
 
-In-process stand-ins for the upstreams an [eve](https://eve.dev/docs) agent
-reads, so it runs without credentials and without touching production data.
-
-- **No servers, no ports.** Mocks answer inside the agent's own processes.
-- **No mock branches.** Connections keep their production URLs and their real
-  token code; only `fetch` changes.
-- **Deny by default.** Under `--mocks`, a request that is neither mocked nor
-  allowed throws, so nothing reaches production by accident.
-
-## Use
-
-Route the app's scripts through the wrapper once:
-
-```json
-{
-  "scripts": {
-    "eval": "eve-mocks -- eve eval",
-    "mocks": "eve-mocks"
-  }
-}
-```
+Run an [eve](https://eve.dev/docs) agent and its evals without credentials and
+without touching production. Upstreams are answered inside the agent's own
+processes: no servers, no ports, no mock branches in connection code. Under
+`--mocks`, a request that is neither mocked nor allowed throws.
 
 ```sh
-npm run eval                 # untouched: real APIs
-npm run eval -- --mocks      # upstreams answered by the mocks
-npm run mocks list           # every connection and mock, with its status
+npm run eval -- --mocks
 ```
 
-`eve-mocks init` creates the `mocks/` folder and wraps the `dev` and `eval`
-scripts. A script that chains commands (`&&`, `;`, `|`) is skipped: the shell
-splits it before the wrapper runs, so wrap the command that starts eve by hand.
+```
+eve-mocks: mocked: auth 2, notion 6, tracker 10
+eve-mocks: allowed: ai-gateway.vercel.sh 14
+eve-mocks: blocked: logs.example.com 1
+```
 
-`--mocks` sits in the wrapped command, not before `--`, because a package
-manager appends script arguments at the end. The wrapper removes it before the
-command sees it.
+## Set up, once
 
-## Defining a mock
+```sh
+npx eve-mocks init     # creates mocks/, wraps the dev and eval scripts in package.json
+npx eve info           # compiles the app, so eve-mocks can read its connections
+npx eve-mocks list     # what is mocked, allowed, and blocked
+```
 
-One file per upstream at the top level of `mocks/`. Each default-exports a
-mock, an allow entry, or an array of them. The file name is the mock's name in
-`list` and in the call summary. Subfolders are ignored, so schemas and
-fixtures can live next to the mocks.
+`init` turns `"eval": "eve eval"` into `"eval": "eve-mocks -- eve eval"`.
+Without `--mocks` that script runs untouched, against the real APIs. A script
+that chains commands (`&&`, `;`, `|`) is skipped; wrap the command that starts
+eve by hand. Add `"mocks": "eve-mocks"` to the scripts for the commands below.
 
-**MCP server**, from its pulled `tools/list` plus one result per tool:
+## Mock a connection
+
+```sh
+npm run mocks list             # 1. pick a row that says blocked
+npm run mocks add tracker       # 2. writes mocks/tracker.ts with its URL and protocol
+npm run mocks pull tracker      # 3. saves the real tool list or OpenAPI spec to mocks/schemas/
+```
+
+4\. Fill in what your evals assert on. An MCP server needs one result per tool:
 
 ```ts
 // mocks/tracker.ts
@@ -53,23 +46,11 @@ export default defineMcpMock({
   url: "https://tracker.example.com/mcp",
   results: {
     get_issue: (args) => ({ identifier: String(args.id), title: "Stale numbers" }),
-    list_teams: () => ({ teams: [TEAM] }),
   },
 });
 ```
 
-The schema file carries the real tool names, descriptions, and input schemas.
-The model reads them, so a paraphrased description makes an eval test a
-different prompt than production.
-
-The mock lists exactly the tools that have a result. A hosted server's real
-`tools/list` can hold dozens of tools, mutations included; a read-only
-connection that allows 20 of them gets a mock with 20 results, which lists 20
-tools. eve filters tools by the connection's
-allow-list anyway, so a tool without a result is one the model could not call.
-
-**REST upstream**, from pinned routes, its pulled OpenAPI document (3.0
-or 3.1), or both:
+A REST upstream answers from its spec, plus the routes you pin:
 
 ```ts
 // mocks/notion.ts
@@ -77,197 +58,91 @@ import { defineHttpMock } from "eve-mocks";
 
 export default defineHttpMock({
   url: "https://api.notion.com/",
-  source: "https://developers.notion.com/openapi.json",
+  spec: "https://developers.notion.com/openapi.json",
   routes: {
-    "/v1/search": {
-      POST: async ({ request }) => {
-        const { query } = (await request.json()) as { query: string };
-
-        return { results: PAGES.filter((page) => page.title.includes(query)), has_more: false };
-      },
-    },
-    "/v1/pages/{page_id}": {
-      GET: ({ params }) => ({ ...PAGE, id: params.page_id }),
-      PATCH: () => new Response(null, { status: 403 }),
-    },
+    "/v1/pages/{page_id}": { GET: ({ params }) => ({ ...PAGE, id: params.page_id }) },
   },
 });
 ```
 
-- **Routes** are path, then method. Paths use the spec's `{param}` syntax, so
-  they copy from the spec; methods are upper-case, as in `Request.method`. A
-  handler receives `{ request, params }` and returns a `Response`, or any JSON
-  value sent as 200.
-- **Without a route**, the spec answers with the operation's lowest 2xx
-  response: the media `example` when there is one, else a sample generated from
-  the response schema. Generated samples are smoke-test data (`"string"`, arrays of
-  one); pin anything an eval asserts on.
-- **Neither** answers 404, so a call the real API would reject does not pass
-  silently.
-- **Without `source` and without a schema file**, only the routes answer.
+5\. Commit `mocks/` with `mocks/schemas/`. Evals then run offline, and a changed
+tool description shows up as a diff.
 
-A mock file never spells a schema path. The file name decides it:
-`mocks/notion.ts` reads `mocks/schemas/notion.openapi.json`, and
-`mocks/tracker.ts` reads `mocks/schemas/tracker.tools.json`. Commit the
-schemas: evals then run offline and without credentials, and a changed tool
-description shows up as a diff instead of as an eval that fails on one machine.
+A typo in a route or tool name stops the run before the agent starts, with the
+nearest valid name. More: [defining mocks](docs/defining-mocks.md) (spec forms,
+token endpoints, checks) and [schema files](docs/schemas.md) (auth for `pull`,
+OAuth-protected MCP servers).
 
-## Checks before a run
+## A run says `blocked`
 
-Before the wrapped command starts, and on `list`, every mock is checked against
-its schema file. A mismatch stops the run with the nearest valid name:
+A blocked call throws inside the agent and fails the run with exit 1. The
+`blocked:` line of the summary is the to-do list. For each host, either:
 
-```
-eve-mocks: Route POST /v1/serach matches no operation of https://api.notion.com/
-  fix: Did you mean POST /v1/search? Paths use the spec's {param} syntax and methods are upper-case
-
-eve-mocks: Result "get_isue" names no tool of https://tracker.example.com/mcp
-  fix: Did you mean get_issue? Else refresh the schema file with eve-mocks pull tracker
-```
-
-A schema file that was never pulled stops the run too:
-
-```
-eve-mocks: No schema for notion at mocks/schemas/notion.openapi.json
-  why: The mock answers from the OpenAPI document of https://developers.notion.com/openapi.json, and it has not been pulled
-  fix: Run: eve-mocks pull notion
-```
-
-## Schema files: `pull` and `add`
-
-```sh
-eve-mocks pull            # refresh every schema file that names a source
-eve-mocks pull notion     # one mock
-eve-mocks add catalog     # scaffold mocks/catalog.ts from eve's manifest
-```
-
-`pull` writes into `mocks/schemas/`. One failing upstream does not stop the
-others.
-
-- **REST**: downloads the mock's `source`. A public spec needs nothing else.
-- **MCP**: runs the official
-  [MCP inspector](https://github.com/modelcontextprotocol/inspector) through
-  `npx` and saves its `tools/list`. The inspector does the OAuth sign-in hosted
-  servers require: the first pull in a terminal opens the browser, the token
-  lands in `~/.mcp-inspector`, and later pulls reuse it, from an agent or CI too.
-
-Auth for a protected upstream comes from `--header`, from the mock file, or
-both; the flag wins:
-
-```sh
-eve-mocks pull events --header "x-api-key: $SECRET"
-eve-mocks pull pager --header "Authorization: Bearer $TOKEN"
-```
-
-```ts
-defineHttpMock({
-  url: "https://events.example.com/",
-  source: "https://events.example.com/openapi.json",
-  headers: async () => ({ "x-api-key": process.env.SECRET ?? "" }),
-});
-```
-
-`headers` is sent by `pull` only, never to a mocked request. It must be
-self-contained: read the environment, do not import app code. When auth is missing, the error says which of the two to use:
-
-```
-tracker                  failed: tools/list failed for https://tracker.example.com/mcp
-  fix: The server uses OAuth. Run eve-mocks pull tracker once in a terminal to sign in through the browser; …
-
-events                  failed: OpenAPI spec download failed for https://…/openapi.json
-  fix: Check the source URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" …
-```
-
-`add` knows a static connection's protocol and URL from the manifest. A dynamic
-connection has neither there; write its mock by hand.
-
-**Token endpoints**, so each connection's real `getToken` still runs:
-
-```ts
-// mocks/auth.ts
-import { oauthToken, vercelConnect } from "eve-mocks";
-
-const AUTH = [vercelConnect(), oauthToken({ url: "https://auth.example.com/oauth/token" })];
-
-export default AUTH;
-```
-
-`vercelConnect()` also sets an unsigned, unexpired `VERCEL_OIDC_TOKEN` where
-none is set: `@vercel/connect` reads it before it calls the token endpoint.
-
-**Real upstreams that must stay reachable**, such as the model gateway:
+- **mock it**: [Mock a connection](#mock-a-connection), or
+- **let it through**, when the eval needs the real thing, such as the model:
 
 ```ts
 // mocks/allowed.ts
 import { allow } from "eve-mocks";
 
-const ALLOWED = [allow({ url: "https://ai-gateway.vercel.sh/" })];
-
-export default ALLOWED;
+export default [allow({ url: "https://ai-gateway.vercel.sh/" })];
 ```
 
-## What happens to a request under `--mocks`
+The thrown error carries the `allow(...)` line to paste. What passes without
+either: [request rules](docs/how-it-works.md#what-happens-to-a-request-under---mocks).
 
-| Request | Result |
-| --- | --- |
-| URL starts with a mock's `url` | answered in-process |
-| URL starts with an `allow` entry | sent to the real upstream |
-| loopback (`localhost`, `127.0.0.1`, `[::1]`) | passes: eve's processes talk over it |
-| `data:`, `blob:`, `file:` | passes: no network involved |
-| anything else | throws, with the `allow(...)` line to paste |
+## Run in CI
 
-The run ends with a summary; the `blocked` line is the to-do list:
-
-```
-eve-mocks: mocked: auth 2, notion 6, tracker 10
-eve-mocks: allowed: ai-gateway.vercel.sh 14
-eve-mocks: blocked: logs.example.com 1
+```yaml
+- run: npm ci
+- run: npm run eval -- --mocks
+  env:
+    AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }} # the one allowed upstream
+- uses: actions/upload-artifact@v4
+  if: always()
+  with: { name: eve-mocks-report, path: .eve-mocks/report.json }
 ```
 
-## `list`
+- **Schemas are committed, not pulled.** `pull` runs on your machine; CI reads
+  `mocks/schemas/` and needs neither the upstreams nor their credentials.
+- **A blocked call fails the run**, even when every eval passed: a model that
+  recovers from the thrown error would otherwise hide that the agent reached
+  for an upstream nobody decided on. Opt out with `--no-fail-on-blocked`.
+- **Secrets**: only those of the upstreams in `allowed.ts`. Token endpoints are
+  mocked; see [token endpoints](docs/defining-mocks.md#token-endpoints-and-allowed-upstreams).
+- **Report**: `.eve-mocks/report.json` holds the latest run: calls per upstream
+  and per MCP tool. The folder ignores itself in git. Shape: `eve-mocks --help`.
 
+To also fail when a connection has no mock yet, before any eval runs:
+
+```yaml
+- run: npx eve info
+- run: npx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'
 ```
-catalog       NOT_SUPPORTED   https://catalog.example.com/api
-logs     UNKNOWN_URL     dynamic connection, URL unknown before a session starts
-tracker          SUPPORTED       https://tracker.example.com/mcp
-auth            SUPPORTED       https://api.vercel.com/v1/connect/token/ (not an eve connection)
+
+## Something is off
+
+```sh
+npx eve-mocks info     # versions, paths, counts, and each problem with its fix
 ```
 
-Connections come from eve's compiled manifest
-(`.eve/compile/compiled-agent-manifest.json`). eve documents that file's path
-but not its fields, so its shape is checked on every read and an unknown shape
-fails with an error instead of a wrong list. Without a manifest, `list` prints
-the mocks and how to get one (`eve info`). A run does not need the manifest.
+Every error prints `why` and `fix`. Known limits, such as sandbox traffic and
+clients that do not use `fetch`: [constraints](docs/how-it-works.md#constraints).
 
-A dynamic connection (`defineDynamic`) has no URL in the manifest; it is
-matched to a mock by name, and shows `UNKNOWN_URL` without one. It is still
-guarded: deny by default does not need to know the URL.
+## For coding agents
 
-## How it works
+```sh
+eve-mocks --help             # every command, option, JSON shape, and exit code
+eve-mocks <command> --help
+eve-mocks list --json        # with --json, an error is JSON on stderr too
+```
 
-The wrapper starts the command with `NODE_OPTIONS=--import=<preload>` and
-`BUN_OPTIONS=--preload=<preload>`. Both are inherited, so the preload runs in
-every process the command spawns, which is how eve runs connections. The
-preload loads `mocks/`, patches global `fetch`, and appends one line per call
-to a log the wrapper summarises at exit. Without `--mocks` the command runs
-untouched: no environment, no preload.
+The help needs no README. stdout holds the result only; hints and errors go to
+stderr.
 
-## Constraints
+## Reference
 
-- **Only `fetch` is patched.** A client built on `node:http`, such as the
-  LaunchDarkly server SDK, is neither mocked nor blocked. eve's MCP and OpenAPI
-  connections all use `fetch`.
-- **MCP mocks are stateless.** eve's MCP client calls tools without an
-  `mcp-session-id` header, as the hosted servers allow. A session-checking
-  server answers `Missing mcp-session-id header` (HTTP 400). See the
-  [transport spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#session-management).
-- **Every top-level file in `mocks/` is imported**, by the CLI and by the
-  preload. Keep scripts and tests in a subfolder, or they run on every load.
-- **Relative imports in mock files need the `.ts` extension.** Node loads them
-  by type stripping, which does not resolve extensionless imports. See the
-  [Node docs](https://nodejs.org/api/typescript.html#type-stripping). For the
-  same reason a mock file cannot import app code that uses extensionless
-  imports.
-- **Not published yet.** Node refuses to strip types under `node_modules`, so
-  the package needs a JavaScript build before it can ship to npm. Inside this
-  workspace the symlink resolves to the source, which works.
+- [Defining mocks](docs/defining-mocks.md): MCP and REST mocks, spec forms, token endpoints, allowed upstreams, checks
+- [Schema files](docs/schemas.md): `pull`, `add`, auth for protected upstreams
+- [How it works](docs/how-it-works.md): request rules, `list`, dynamic connections, constraints
+- [Example app](example)
