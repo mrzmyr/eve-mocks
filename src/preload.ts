@@ -15,6 +15,7 @@ import { appendFileSync } from "node:fs";
 import { createError } from "./errors.ts";
 import { guardNodeHttp } from "./guard-node-http.ts";
 import { loadMocks, type LoadedMocks } from "./load-mocks.ts";
+import { getSignIn, SIGN_IN, SIGN_IN_ENV } from "./sign-in.ts";
 import type { CallRecord } from "./types.ts";
 
 const { EVE_MOCKS_DIR, EVE_MOCKS_LOG } = process.env;
@@ -94,6 +95,11 @@ for (const { mock } of mocks) {
   }
 }
 
+// After the mocks, so a mock's own value wins; a real value always does.
+for (const [key, value] of Object.entries(SIGN_IN_ENV)) {
+  process.env[key] ??= value;
+}
+
 /**
  * Tool name of an MCP `tools/call`, so the report says which tools an eval
  * used; every MCP call is a POST to one URL. Undefined for any other request.
@@ -165,6 +171,16 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (pass) {
     logCall({ outcome: "allowed", target: pass.name, method, url });
     return realFetch(input, init);
+  }
+
+  // Last, so it only ever replaces a blocked call: a mock or an allow entry
+  // for the token endpoint has already won above.
+  const request = new Request(input, init);
+  const signIn = await getSignIn({ request });
+
+  if (signIn) {
+    logCall({ outcome: "mocked", target: SIGN_IN, method, url });
+    return signIn.handle(request, { name: SIGN_IN });
   }
 
   logCall({ outcome: "blocked", target: host, method, url });

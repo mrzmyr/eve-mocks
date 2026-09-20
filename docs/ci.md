@@ -35,9 +35,9 @@ Opt out with `--no-fail-on-blocked`, in the wrapped command or before `--`.
 ### Which secrets does CI need?
 
 Only those of the upstreams you [allow](allow.md), usually just the model
-gateway. Connection credentials are not needed: the
-[token endpoints](authentication.md) are mocked, and each connection's real
-token code runs against them.
+gateway. Connection credentials are not needed: every
+[sign-in](authentication.md) is answered locally, and each connection's real
+token code runs against that.
 
 ### Where do I see what the agent called?
 

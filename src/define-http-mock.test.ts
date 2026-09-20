@@ -82,11 +82,11 @@ describe("defineHttpMock spec", () => {
     });
 
     await expect(single.check?.(CONTEXT)).rejects.toThrow(
-      `No schema for shop at ${join(root, "mocks/schemas/shop.openapi.json")}`,
+      `No schema for shop at ${join(root, "mocks/schemas/shop.json")}`,
     );
     await expect(single.check?.(CONTEXT)).rejects.toThrow("Run: eve-mocks pull shop");
     await expect(listed.check?.(CONTEXT)).rejects.toThrow(
-      `No schema for shop at ${join(root, "mocks/schemas/shop.2.openapi.json")}`,
+      `No schema for shop at ${join(root, "mocks/schemas/shop.2.json")}`,
     );
   });
 

@@ -70,8 +70,8 @@ path; the mock's file name decides it:
 <!-- site:filetree -->
 - mocks/
   - schemas/
-    - linear.tools.json
-    - notion.openapi.json
+    - linear.json
+    - notion.json
   - linear.ts
   - notion.ts
 <!-- /site:filetree -->

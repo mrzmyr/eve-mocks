@@ -1,51 +1,46 @@
 # Authentication
 
-A connection signs in before it calls its upstream: it asks a token endpoint
-for a token, then sends that token along. Under `--mocks` the sign-in request is
-blocked like any other:
+You do not have to do anything. A connection signs in before it calls its
+upstream, and eve-mocks answers that sign-in itself:
 
 ```
-eve-mocks  2 calls, 1 blocked
+eve-mocks  4 calls, none blocked
 
-  ✗ blocked   auth.example.com     1
+  ✓ mocked    sign-in     1   answered by default
+              linear      3   get_issue 3
 
   report      .eve-mocks/report.json
 ```
 
-Mock the token endpoint, and the connection's own auth code runs unchanged. It
-gets `mock-token`, and the mocked upstream accepts any token.
+The connection's own auth code runs unchanged. It gets `mock-token`, and a
+mocked upstream accepts any token. No client secret is needed, not locally and
+not in CI.
+
+## What counts as a sign-in
+
+| Sign-in | Recognised by |
+| --- | --- |
+| [Vercel Connect](https://vercel.com/docs/connect) | its token endpoint, `api.vercel.com/v1/connect/token/` |
+| any OAuth 2.0 token endpoint | `grant_type` in the request body, which [every grant sends](https://datatracker.ietf.org/doc/html/rfc6749#section-4) |
+
+A sign-in is only answered when nothing else claims the request. A mock or an
+[allow](allow.md) entry for the same URL wins, so allowing a token endpoint
+still reaches the real one.
+
+## A custom token endpoint
+
+An endpoint that sends no `grant_type` is blocked like any other request. Mock
+it by its URL:
 
 ```ts
 // mocks/auth.ts
 import { oauthToken } from "eve-mocks";
 
-export default oauthToken({ url: "https://auth.example.com/oauth/token" });
+export default oauthToken({ url: "https://auth.example.com/token" });
 ```
 
-```
-eve-mocks  4 calls, none blocked
-
-  ✓ mocked    auth       1
-              linear     3   get_issue 3
-
-  report      .eve-mocks/report.json
-```
-
-You change nothing in the connection, and no client secret is needed, not
-locally and not in CI.
-
-## Vercel Connect
-
-A connection that gets its token from
-[Vercel Connect](https://vercel.com/docs/connect) needs `vercelConnect()`
-instead:
-
-```ts
-// mocks/vercel-connect.ts
-import { vercelConnect } from "eve-mocks";
-
-export default vercelConnect();
-```
+It answers `{ access_token: "mock-token", token_type: "Bearer" }`. For another
+shape, use [`defineHttpMock`](mocks.md#http) with a route.
 
 Signing in to download a schema is a different topic:
 [pull from a protected upstream](mocks.md#protected-upstreams).

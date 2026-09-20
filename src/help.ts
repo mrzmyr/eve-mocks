@@ -38,6 +38,11 @@ Global options
   -h, --help      help for eve-mocks or for the command before it
   -v, --version   print the version
 
+Sign-ins
+  A Vercel Connect token request and any OAuth 2.0 token request (grant_type in
+  the body) are answered with a mock token when no mock or allow entry claims
+  them, so connections need no mock for their token endpoint.
+
 Output
   stdout holds the result only; hints, warnings, and errors go to stderr.
   Colour is dropped for NO_COLOR and when stdout is not a terminal.

@@ -184,7 +184,7 @@ function isRemote({ entry }: { readonly entry: string }): boolean {
  * @param input.url - Production URL prefix the paths hang off.
  * @param input.spec - The upstream's OpenAPI JSON: a URL, a local path, or an
  *   array of them. A URL is downloaded by `eve-mocks pull` into
- *   `schemas/<mock>.openapi.json`, or `schemas/<mock>.<position>.openapi.json`
+ *   `schemas/<mock>.json`, or `schemas/<mock>.<position>.json`
  *   when `spec` is an array. A local path resolves against the mocks directory
  *   and is read in place, so the mock and the connection can share one file.
  *   An array merges the documents' operations, for several connections on one
@@ -214,7 +214,7 @@ export function defineHttpMock({
 
     if (typeof spec === "string") {
       if (isRemote({ entry: spec })) {
-        return [{ entry: spec, path: getSchemaPath({ name, kind: "openapi" }), isRemote: true }];
+        return [{ entry: spec, path: getSchemaPath({ name }), isRemote: true }];
       }
 
       return [{ entry: spec, path: resolve(getMocksDir({ name }), spec), isRemote: false }];
@@ -224,7 +224,7 @@ export function defineHttpMock({
       if (isRemote({ entry })) {
         return {
           entry,
-          path: getSchemaPath({ name: `${name}.${index + 1}`, kind: "openapi" }),
+          path: getSchemaPath({ name: `${name}.${index + 1}` }),
           isRemote: true,
         };
       }

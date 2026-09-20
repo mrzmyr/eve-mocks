@@ -25,7 +25,7 @@ type Tool = {
 
 /**
  * Mock a hosted MCP server from its pulled `tools/list` and a result per
- * tool. The schema file is `schemas/<mock>.tools.json`, which
+ * tool. The schema file is `schemas/<mock>.json`, which
  * `eve-mocks pull` writes.
  *
  * The file carries the real names, descriptions, and input schemas, because the
@@ -64,7 +64,7 @@ export function defineMcpMock({
       return served;
     }
 
-    const path = getSchemaPath({ name, kind: "tools" });
+    const path = getSchemaPath({ name });
 
     if (!existsSync(path)) {
       throw createError({
@@ -138,7 +138,7 @@ export function defineMcpMock({
           continue;
         }
 
-        const path = getSchemaPath({ name: context.name, kind: "tools" });
+        const path = getSchemaPath({ name: context.name });
         const all = (
           readJson({ path, fix: `Pull it again: eve-mocks pull ${context.name}` }) as { readonly tools: Tool[] }
         ).tools;
@@ -211,7 +211,7 @@ export function defineMcpMock({
         });
       }
 
-      const path = getSchemaPath({ name, kind: "tools" });
+      const path = getSchemaPath({ name });
       let listed: { readonly tools: readonly Tool[] };
 
       try {

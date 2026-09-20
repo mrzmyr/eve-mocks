@@ -22,6 +22,7 @@ import { loadMocks } from "./load-mocks.ts";
 import { readManifest } from "./read-manifest.ts";
 import { createLog, STATE_DIR, writeReport, type Report } from "./report.ts";
 import { resolveConnections } from "./resolve-connections.ts";
+import { SIGN_IN } from "./sign-in.ts";
 import type { CallRecord } from "./types.ts";
 
 /** The preload, as a file URL so a path with spaces survives `NODE_OPTIONS`. */
@@ -344,11 +345,12 @@ async function run({
 
     printReport({
       report,
-      notes: new Map(
-        [...connections].map(([host, name]) => {
+      notes: new Map([
+        [SIGN_IN, "answered by default"],
+        ...[...connections].map(([host, name]): [string, string] => {
           return [host, `connection "${name}"`];
         }),
-      ),
+      ]),
     });
 
     if (exitCode === 0 && blocked.length > 0 && shouldFailOnBlocked && !command.includes(ALLOW_BLOCKED_FLAG)) {

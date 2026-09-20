@@ -86,7 +86,7 @@ the upstream or its credentials.
 <!-- site:filetree -->
 - mocks/
   - schemas/
-    - linear.tools.json
+    - linear.json
   - linear.ts
 <!-- /site:filetree -->
 
@@ -169,7 +169,7 @@ eve-mocks  5 calls, none blocked
 ## Next Steps
 
 - **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and protected upstreams.
-- **[Authentication](docs/authentication.md)**: what to do when a connection's sign-in is blocked.
+- **[Authentication](docs/authentication.md)**: sign-ins are answered for you, and the one exception.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
 - **[FAQ](docs/faq.md)**: several specs on one host, local spec files, and clients that do not use `fetch`.

@@ -44,7 +44,7 @@ const PAGES: readonly Page[] = [
     source: "docs/authentication.md",
     slug: "authentication",
     title: "Authentication",
-    description: "A connection signs in before it calls its upstream. Mock that request too.",
+    description: "Sign-ins are answered for you. Here is how, and the one exception.",
   },
   {
     source: "docs/allow.md",

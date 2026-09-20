@@ -54,6 +54,19 @@ writeFileSync(
    attempt("loopback", () => http.get("http://127.0.0.1:9/").on("error", () => {}).destroy());`,
 );
 
+// A connection's sign-in: an OAuth token request, then Vercel Connect, then a plain POST.
+writeFileSync(
+  join(APP_ROOT, "sign-in.mjs"),
+  `const oauth = await fetch("https://login.example.com/oauth/token", {
+     method: "POST",
+     headers: { "content-type": "application/x-www-form-urlencoded" },
+     body: new URLSearchParams({ grant_type: "client_credentials", client_id: "x" }),
+   });
+   const connect = await fetch("https://api.vercel.com/v1/connect/token/linear", { method: "POST" });
+   console.log((await oauth.json()).access_token, (await connect.json()).token);
+   await fetch("https://login.example.com/users", { method: "POST", body: "{}" }).catch(() => console.log("plain POST blocked"));`,
+);
+
 /** Run the CLI on Node, as its shebang does; in an empty app root unless `cwd` names another. */
 function run({ args, cwd = EMPTY_ROOT }: { readonly args: readonly string[]; readonly cwd?: string }) {
   return spawnSync("node", [join(import.meta.dir, "cli.ts"), ...args], { cwd, encoding: "utf8" });
@@ -186,5 +199,13 @@ describe("cli", () => {
       });
 
     expect(allowed).toEqual(["a.example.com", "b.example.com", "model-gateway"]);
+  });
+
+  test("answers a sign-in by default, and still blocks another POST to the same host", () => {
+    const { stdout, stderr, status } = run({ args: ["--", "node", "sign-in.mjs", "--mocks"], cwd: APP_ROOT });
+
+    expect(stdout.trim().split("\n")).toEqual(["mock-token mock-token", "plain POST blocked"]);
+    expect(stderr).toContain("answered by default");
+    expect(status).toBe(1);
   });
 });
