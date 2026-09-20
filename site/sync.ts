@@ -84,3 +84,14 @@ for (const page of PAGES) {
   writeFileSync(join(OUT, `${page.slug}.mdx`), `${frontMatter}${body}`);
   console.log(`content/${page.slug}.mdx from ${page.source}`);
 }
+
+// Sidebar order: the workflow first, then the references it links to.
+const order = PAGES.map(({ slug }) => {
+  return slug;
+});
+
+writeFileSync(
+  join(OUT, "meta.ts"),
+  `import { defineMeta } from "blume";\n\nexport default defineMeta({ pages: ${JSON.stringify(order)} });\n`,
+);
+console.log("content/meta.ts");
