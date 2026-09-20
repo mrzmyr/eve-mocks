@@ -35,7 +35,7 @@ model that recovers from the thrown error would otherwise hide that the agent
 reached for an upstream nobody decided on.
 
 ```
-eve-mocks  31 calls, 1 blocked
+❅ eve-mocks  31 calls, 1 blocked
 
   ✓ mocked    linear              10   get_issue 6, list_teams 4
               notion               6

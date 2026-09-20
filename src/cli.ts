@@ -17,7 +17,7 @@ import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getCoverage, type Coverage } from "./get-coverage.ts";
 import { getInfo } from "./get-info.ts";
-import { COMMAND_HELP, COMMANDS, isCommand, OVERVIEW } from "./help.ts";
+import { COMMAND_HELP, COMMANDS, isCommand, MARK, OVERVIEW } from "./help.ts";
 import { loadMocks } from "./load-mocks.ts";
 import { readManifest } from "./read-manifest.ts";
 import { createLog, STATE_DIR, writeReport, type Report } from "./report.ts";
@@ -106,7 +106,7 @@ function printReport({
     headline = "no upstream call was made";
   }
 
-  console.error(`\n${styleText("bold", "eve-mocks", { stream })}  ${styleText("dim", headline, { stream })}\n`);
+  console.error(`\n${styleText("bold", `${MARK} eve-mocks`, { stream })}  ${styleText("dim", headline, { stream })}\n`);
 
   const width = Math.max(
     ...report.targets.map(({ target }) => {

@@ -1,3 +1,6 @@
+/** The project's mark, printed before the name in the run summary and the overview. */
+export const MARK = "❅";
+
 /** Commands `eve-mocks help <command>` knows, in the order the overview lists them. */
 export const COMMANDS = ["list", "info", "add", "pull", "init", "help"] as const;
 
@@ -13,7 +16,7 @@ export function isCommand(value: string): value is Command {
  * The overview `eve-mocks --help` prints. It states the output and exit-code
  * contract in full, since a coding agent reads this instead of the README.
  */
-export const OVERVIEW = `eve-mocks: in-process upstream mocks for eve agents
+export const OVERVIEW = `${MARK} eve-mocks: in-process upstream mocks for eve agents
 
 Usage
   eve-mocks [--dir <path>] -- <command> [--mocks]   run a command; upstreams are mocked

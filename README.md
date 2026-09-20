@@ -134,7 +134,7 @@ bun run eval --mocks
 ```
 
 ```
-eve-mocks  5 calls, 2 blocked
+❅ eve-mocks  5 calls, 2 blocked
 
   ✓ mocked    linear             3   get_issue 3
   ✗ blocked   api.notion.com     2   connection "notion"
@@ -156,7 +156,7 @@ export default allow({ url: "https://api.notion.com/" });
 A green run has no `blocked` row. Commit `mocks/`:
 
 ```
-eve-mocks  5 calls, none blocked
+❅ eve-mocks  5 calls, none blocked
 
   ✓ mocked    linear     3   get_issue 3
   → allowed   notion     2
