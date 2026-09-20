@@ -78,9 +78,9 @@ export const COMMAND_HELP: Readonly<Record<Command, string>> = {
   list: `eve-mocks list [--dir <path>] [--json]
 
 What a call to each upstream does under --mocks:
-  mocked    a mock answers
-  allowed   an allow() entry lets it reach the real upstream
-  blocked   neither, so the call throws
+  mock    a mock answers
+  allow   an allow() entry lets it reach the real upstream
+  block   neither, so the call throws
 
 Rows come in two groups: the app's eve connections, then the mocks and allow
 entries that match none of them, such as a token endpoint. Connections are read

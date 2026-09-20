@@ -40,6 +40,9 @@ const OUTCOME_COLORS = { mocked: "green", allowed: "yellow", blocked: "red" } as
 /** Icon of each outcome, so `list` still reads without colour. */
 const OUTCOME_ICONS = { mocked: "✓", allowed: "→", blocked: "✗" } as const;
 
+/** Label of each outcome as printed: the verb, so it reads as what the call does. */
+const OUTCOME_LABELS = { mocked: "mock", allowed: "allow", blocked: "block" } as const;
+
 /** What each outcome means, for the legend below `list`. */
 const OUTCOME_LEGEND = {
   mocked: "a mock answers",
@@ -63,7 +66,7 @@ function formatOutcome({
 }): string {
   // styleText drops the colour for NO_COLOR and for a stream that is not a TTY.
   // See https://nodejs.org/api/util.html#utilstyletextformat-text-options
-  return styleText(OUTCOME_COLORS[outcome], `${OUTCOME_ICONS[outcome]} ${outcome}`.padEnd(width), { stream });
+  return styleText(OUTCOME_COLORS[outcome], `${OUTCOME_ICONS[outcome]} ${OUTCOME_LABELS[outcome]}`.padEnd(width), { stream });
 }
 
 /** Label of each upstream type in `list`. */

@@ -76,7 +76,7 @@ runtime       node v24.11.0
 eve           0.47.6
 mocks dir     /app/mocks (12 mocks, 3 allowed)
 manifest      /app/.eve/compile/compiled-agent-manifest.json (version 45)
-connections   ✓ mocked 10  → allowed 0  ✗ blocked 14
+connections   ✓ mock 10  → allow 0  ✗ block 14
 ```
 
 `info` changes nothing and exits 0 even when part of the setup is missing: each
