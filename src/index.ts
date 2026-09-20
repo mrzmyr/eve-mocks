@@ -9,7 +9,7 @@ export type {
   Mock,
   MockContext,
   PullContext,
-  PullOptions,
+  PullHeaders,
   RouteContext,
   RouteHandler,
   Routes,

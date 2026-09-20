@@ -6,7 +6,7 @@ import { sample } from "openapi-sampler";
 import { createError, MockError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
-import type { Mock, MockContext, PullOptions, Routes } from "./types.ts";
+import type { Mock, MockContext, PullHeaders, Routes } from "./types.ts";
 
 /** A JSON object node of an OpenAPI document. */
 type Node = { readonly [key: string]: unknown };
@@ -16,7 +16,7 @@ const METHODS = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TR
 
 /** What to try when a spec download fails; most failures are missing auth. */
 const AUTH_HINT =
-  'Check the source URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable), or set pull.headers in the mock file';
+  'Check the source URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable), or set headers in the mock file';
 
 /** Whether `value` is a JSON object, not an array or `null`. */
 function isNode(value: unknown): value is Node {
@@ -148,20 +148,20 @@ function toResponse(result: unknown): Response {
  *
  * @param input.url - Production URL prefix the paths hang off.
  * @param input.source - URL of the upstream's OpenAPI JSON.
- * @param input.pull - How `eve-mocks pull` authenticates against `source`;
- *   `--header` flags add to it and win.
+ * @param input.headers - Auth for `eve-mocks pull` against `source`. Sent by
+ *   `pull` only, never to a mocked request; `--header` flags add to it and win.
  * @param input.routes - Pinned answers, path then method. With a schema file,
  *   every route must name an operation it declares; `check` enforces it.
  */
 export function defineHttpMock({
   url,
   source,
-  pull,
+  headers,
   routes = {},
 }: {
   readonly url: string;
   readonly source?: string;
-  readonly pull?: PullOptions;
+  readonly headers?: PullHeaders;
   readonly routes?: Routes;
 }): Mock {
   let basePath = new URL(url).pathname;
@@ -312,7 +312,9 @@ export function defineHttpMock({
         }
       }
     },
-    pull: async ({ name, headers }) => {
+    pull: async (context) => {
+      const { name } = context;
+
       if (source === undefined) {
         return undefined;
       }
@@ -321,7 +323,7 @@ export function defineHttpMock({
         // `redirect: "error"`: a protected spec redirects to a login page, which
         // would otherwise be followed and fail later as unparseable JSON.
         const response = await fetch(source, {
-          headers: { ...(await pull?.headers?.()), ...headers },
+          headers: { ...(await headers?.()), ...context.headers },
           redirect: "error",
         });
 

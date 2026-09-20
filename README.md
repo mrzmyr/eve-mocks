@@ -163,12 +163,12 @@ eve-mocks pull pager --header "Authorization: Bearer $TOKEN"
 defineHttpMock({
   url: "https://events.example.com/",
   source: "https://events.example.com/openapi.json",
-  pull: { headers: async () => ({ "x-api-key": process.env.SECRET ?? "" }) },
+  headers: async () => ({ "x-api-key": process.env.SECRET ?? "" }),
 });
 ```
 
-`pull.headers` must be self-contained: read the environment, do not import app
-code. When auth is missing, the error says which of the two to use:
+`headers` is sent by `pull` only, never to a mocked request. It must be
+self-contained: read the environment, do not import app code. When auth is missing, the error says which of the two to use:
 
 ```
 tracker                  failed: tools/list failed for https://tracker.example.com/mcp
