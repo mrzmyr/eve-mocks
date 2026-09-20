@@ -1,6 +1,6 @@
 # CLI
 
-Reference. For the first mock, see the [README](../README.md).
+
 
 ```sh
 eve-mocks --help             # every command, option, JSON shape, and exit code

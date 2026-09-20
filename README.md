@@ -174,9 +174,11 @@ eve-mocks
 
 ## Next Steps
 
-- **[Defining mocks](docs/defining-mocks.md)**: MCP and HTTP mocks in full: spec forms, routes, token endpoints, allowed upstreams, and the checks before a run.
-- **[Schema files](docs/schemas.md)**: `pull` and `add` in detail, plus auth for a protected upstream and OAuth-protected MCP servers.
-- **[Run in CI](docs/ci.md)**: the workflow, which secrets you still need, the coverage gate, and the run report.
-- **[CLI](docs/cli.md)**: every command, `--json`, exit codes, and what coding agents can rely on.
-- **[How it works](docs/how-it-works.md)**: the preload, what happens to each request, dynamic connections, and the known limits.
-- **[Example app](example)**: a tiny app with mocks, run under both Node and Bun.
+- **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and the checks before a run.
+- **[Authentication](docs/authentication.md)**: mock token endpoints, and pull from a protected upstream.
+- **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
+- **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
+- **[Run in CI](docs/guides/ci.md)**: the workflow, secrets, the coverage gate, and the run report.
+- **[FAQ](docs/faq.md)**: several specs on one host, local spec files, dynamic connections, and more.
+- **[How it works](docs/how-it-works.md)**: the preload, request rules, and the known limits.
+- **[Example app](example)**: a tiny app with mocks, run under Node and Bun.

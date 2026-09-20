@@ -1,7 +1,5 @@
 # Run in CI
 
-Reference. For the first mock, see the [README](../README.md).
-
 ```yaml
 - run: bun install --frozen-lockfile
 - run: bun run eval --mocks
@@ -35,7 +33,7 @@ Opt out with `--no-fail-on-blocked`, in the wrapped command or before `--`.
 Only the upstreams in `allowed.ts` need one, usually just the model gateway.
 Connection credentials are not needed, because the token endpoints are mocked
 and each connection's real token code still runs against them. See
-[token endpoints](defining-mocks.md#token-endpoints-and-allowed-upstreams).
+[token endpoints](../authentication.md#token-endpoints).
 
 ## The run report
 

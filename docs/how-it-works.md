@@ -1,7 +1,5 @@
 # How it works
 
-Reference. For the workflow, see the [README](../README.md).
-
 The wrapper starts the command with `NODE_OPTIONS=--import=<preload>` and
 `BUN_OPTIONS=--preload=<preload>`. Both are inherited, so the preload runs in
 every process the command spawns, which is how eve runs connections. The
