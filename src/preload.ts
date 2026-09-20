@@ -57,12 +57,12 @@ guardNodeHttp({
       return;
     }
 
-    const isAllowed = allowed.some((entry) => {
+    const pass = allowed.find(({ entry }) => {
       return url.startsWith(entry.url);
     });
 
-    if (isAllowed) {
-      logCall({ outcome: "allowed", target: host, method, url });
+    if (pass) {
+      logCall({ outcome: "allowed", target: pass.name, method, url });
       return;
     }
 
@@ -158,12 +158,12 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return realFetch(input, init);
   }
 
-  const isAllowed = allowed.some((entry) => {
+  const pass = allowed.find(({ entry }) => {
     return url.startsWith(entry.url);
   });
 
-  if (isAllowed) {
-    logCall({ outcome: "allowed", target: host, method, url });
+  if (pass) {
+    logCall({ outcome: "allowed", target: pass.name, method, url });
     return realFetch(input, init);
   }
 

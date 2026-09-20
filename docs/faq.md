@@ -88,6 +88,16 @@ Yes. Only the flag differs: `npm run eval -- --mocks` needs the `--`, `bun run
 eval --mocks` does not. The CLI always runs on Node, because its shebang asks
 for it; the command it wraps may run on Node or Bun.
 
+### Can one file allow several upstreams?
+
+Yes, default-export an array. Entries that share a file cannot share its name,
+so `list` and the run summary name each by its host. One file per upstream
+reads better.
+
+```ts
+export default [allow({ url: "https://a.example.com/" }), allow({ url: "https://b.example.com/" })];
+```
+
 ### Can one run use a different set of mocks?
 
 Yes, point `--dir` at another folder: `eve-mocks --dir mocks/outage -- eve eval

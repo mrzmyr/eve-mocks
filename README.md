@@ -42,6 +42,7 @@ APIs.
 
 <!-- site:filetree -->
 - mocks/
+  - model-gateway.ts
   - vercel-connect.ts
 - package.json
 <!-- /site:filetree -->
@@ -81,6 +82,7 @@ eve's own manifest.
 <!-- site:filetree -->
 - mocks/
   - linear.ts
+  - model-gateway.ts
   - vercel-connect.ts
 <!-- /site:filetree -->
 
@@ -99,6 +101,7 @@ the upstream or its credentials.
   - schemas/
     - linear.tools.json
   - linear.ts
+  - model-gateway.ts
   - vercel-connect.ts
 <!-- /site:filetree -->
 
@@ -152,13 +155,14 @@ eve-mocks
 
 `mocked` was answered in-process. `blocked` is the to-do list, and it fails the
 run with exit 1 even when every eval passed. Repeat steps 3 to 5 for each host,
-or let it through when the eval needs the real thing, such as the model:
+or let it through when the eval needs the real thing. `init` already did that
+for the model:
 
 ```ts
-// mocks/allowed.ts
+// mocks/model-gateway.ts
 import { allow } from "eve-mocks";
 
-export default [allow({ url: "https://ai-gateway.vercel.sh/" })];
+export default allow({ url: "https://ai-gateway.vercel.sh/" });
 ```
 
 A green run has no `blocked` row. Commit `mocks/` with `mocks/schemas/`:
@@ -166,7 +170,7 @@ A green run has no `blocked` row. Commit `mocks/` with `mocks/schemas/`:
 ```
 eve-mocks
   ✓ mocked    auth 2, notion 6, linear 10
-  → allowed   ai-gateway.vercel.sh 14
+  → allowed   model-gateway 14
   report      .eve-mocks/report.json
 ```
 

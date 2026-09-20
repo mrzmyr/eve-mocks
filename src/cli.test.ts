@@ -27,6 +27,17 @@ writeFileSync(
    if (process.argv.includes("--stray")) { await fetch("https://stray.example.com/").catch(() => {}); }`,
 );
 
+writeFileSync(
+  join(APP_ROOT, "mocks/model-gateway.ts"),
+  `import { allow } from ${JSON.stringify(join(import.meta.dir, "index.ts"))};
+   export default allow({ url: "https://ai-gateway.vercel.sh/" });`,
+);
+writeFileSync(
+  join(APP_ROOT, "mocks/allowed.ts"),
+  `import { allow } from ${JSON.stringify(join(import.meta.dir, "index.ts"))};
+   export default [allow({ url: "https://a.example.com/" }), allow({ url: "https://b.example.com/" })];`,
+);
+
 // One line per Node HTTP module: BLOCKED when the guard threw, else REACHED.
 writeFileSync(
   join(APP_ROOT, "legacy.mjs"),
@@ -160,4 +171,17 @@ describe("cli", () => {
       expect(report.counts.blocked).toBe(4);
     });
   }
+
+  test("names an allow entry by its file, and entries that share a file by their host", () => {
+    const { stdout } = run({ args: ["list", "--json"], cwd: APP_ROOT });
+    const allowed = (JSON.parse(stdout) as { name: string; status: string }[])
+      .filter(({ status }) => {
+        return status === "allowed";
+      })
+      .map(({ name }) => {
+        return name;
+      });
+
+    expect(allowed).toEqual(["a.example.com", "b.example.com", "model-gateway"]);
+  });
 });

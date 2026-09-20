@@ -49,9 +49,9 @@ describe("getCoverage", () => {
       ],
       mocks: [createMock({ name: "linear", url: "https://mcp.linear.app/" })],
       allowed: [
-        allow({ url: "https://mcp.linear.app/" }),
-        allow({ url: "https://reports.example.com/" }),
-        allow({ url: "https://ai-gateway.vercel.sh/" }),
+        { name: "mcp.linear.app", entry: allow({ url: "https://mcp.linear.app/" }) },
+        { name: "reports", entry: allow({ url: "https://reports.example.com/" }) },
+        { name: "model-gateway", entry: allow({ url: "https://ai-gateway.vercel.sh/" }) },
       ],
     });
 
@@ -60,9 +60,9 @@ describe("getCoverage", () => {
         return { name, status, type, isConnection };
       }),
     ).toEqual([
-      { name: "ai-gateway.vercel.sh", status: "allowed", type: undefined, isConnection: false },
       { name: "linear", status: "mocked", type: "mcp", isConnection: true },
       { name: "mcp.linear.app", status: "allowed", type: undefined, isConnection: false },
+      { name: "model-gateway", status: "allowed", type: undefined, isConnection: false },
       { name: "reports", status: "allowed", type: "http", isConnection: true },
     ]);
   });

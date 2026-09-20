@@ -1,6 +1,6 @@
-import type { NamedMock } from "./load-mocks.ts";
+import type { NamedAllowed, NamedMock } from "./load-mocks.ts";
 import type { Connection } from "./read-manifest.ts";
-import type { Allowed, CallRecord, UpstreamType } from "./types.ts";
+import type { CallRecord, UpstreamType } from "./types.ts";
 
 /**
  * What a call to the upstream does under `--mocks`, in the words the run
@@ -48,9 +48,9 @@ export function getCoverage({
 }: {
   readonly connections: readonly Connection[];
   readonly mocks: readonly NamedMock[];
-  readonly allowed: readonly Allowed[];
+  readonly allowed: readonly NamedAllowed[];
 }): Coverage[] {
-  const matched = new Set<NamedMock | Allowed>();
+  const matched = new Set<NamedMock | NamedAllowed>();
 
   const rows = connections.map(({ name, url, path, protocol }): Coverage => {
     const isDynamic = path !== undefined;
@@ -93,7 +93,7 @@ export function getCoverage({
       return { ...base, status: "mocked", url };
     }
 
-    const passes = allowed.filter((entry) => {
+    const passes = allowed.filter(({ entry }) => {
       return url.startsWith(entry.url);
     });
 
@@ -123,7 +123,7 @@ export function getCoverage({
 
   for (const entry of allowed) {
     if (!matched.has(entry)) {
-      rows.push({ name: new URL(entry.url).host, status: "allowed", url: entry.url, isConnection: false, isDynamic: false });
+      rows.push({ name: entry.name, status: "allowed", url: entry.entry.url, isConnection: false, isDynamic: false });
     }
   }
 

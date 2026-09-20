@@ -25,7 +25,7 @@ The run ends with a summary; the `blocked` line is the to-do list:
 ```
 eve-mocks
   ✓ mocked    auth 2, notion 6, linear 10
-  → allowed   ai-gateway.vercel.sh 14
+  → allowed   model-gateway 14
   ✗ blocked   logs.example.com 1
   report      .eve-mocks/report.json
 ```
@@ -41,7 +41,7 @@ eve connections
   tenant-api              ✗ blocked   -     dynamic connection, its module constructs no URL before a session starts
 
 other upstreams
-  ai-gateway.vercel.sh    → allowed   -     https://ai-gateway.vercel.sh/
+  model-gateway           → allowed   -     https://ai-gateway.vercel.sh/
   auth                    ✓ mocked    HTTP  https://api.vercel.com/v1/connect/token/
 
 under --mocks: ✓ mocked: a mock answers · → allowed: reaches the real upstream · ✗ blocked: the call throws

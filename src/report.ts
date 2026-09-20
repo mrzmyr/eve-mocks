@@ -13,7 +13,7 @@ const KEPT_RUNS = 10;
 export type TargetCount = {
   /** `mocked`, `allowed`, or `blocked`. */
   readonly outcome: CallRecord["outcome"];
-  /** Mock file name for a mocked call, else the host that was called. */
+  /** Name of the mock or allow entry that matched, else the host that was called. */
   readonly target: string;
   /** Number of calls. */
   readonly calls: number;

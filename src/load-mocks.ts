@@ -13,12 +13,24 @@ export type NamedMock = {
   readonly mock: Mock;
 };
 
+/** An allow entry with the name `list` and the run summary show for it. */
+export type NamedAllowed = {
+  /**
+   * File name without extension, such as `vercel-sandbox`, when the entry is
+   * the file's only one. Entries that share a file cannot share its name, so
+   * each is named by the host it lets through.
+   */
+  readonly name: string;
+  /** The entry the file default-exports. */
+  readonly entry: Allowed;
+};
+
 /** Everything the mocks directory declares. */
 export type LoadedMocks = {
   /** Upstreams answered in-process. */
   readonly mocks: readonly NamedMock[];
   /** Real upstreams that stay reachable. */
-  readonly allowed: readonly Allowed[];
+  readonly allowed: readonly NamedAllowed[];
 };
 
 /** Extensions a mock file can have. */
@@ -67,7 +79,7 @@ export async function loadMocks({ dir }: { readonly dir: string }): Promise<Load
   }
 
   const mocks: NamedMock[] = [];
-  const allowed: Allowed[] = [];
+  const allowed: NamedAllowed[] = [];
 
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const extension = extname(entry.name);
@@ -119,11 +131,20 @@ export async function loadMocks({ dir }: { readonly dir: string }): Promise<Load
       });
     }
 
+    const name = basename(entry.name, extension);
+    const isOnlyEntry = entries.length === 1;
+
     for (const item of entries) {
       if (isAllowed(item)) {
-        allowed.push(item);
+        let allowedName = new URL(item.url).host;
+
+        if (isOnlyEntry) {
+          allowedName = name;
+        }
+
+        allowed.push({ name: allowedName, entry: item });
       } else if (isMock(item)) {
-        mocks.push({ name: basename(entry.name, extension), mock: item });
+        mocks.push({ name, mock: item });
       }
     }
   }

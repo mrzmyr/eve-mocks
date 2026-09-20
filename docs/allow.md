@@ -5,11 +5,16 @@ upstream through to the real thing, for the few an eval cannot do without, such
 as the model.
 
 ```ts
-// mocks/allowed.ts
+// mocks/model-gateway.ts
 import { allow } from "eve-mocks";
 
-export default [allow({ url: "https://ai-gateway.vercel.sh/" })];
+// Evals need a real model.
+export default allow({ url: "https://ai-gateway.vercel.sh/" });
 ```
+
+One file per allowed upstream, with a comment that says why. The file name is
+its name in `list` and in the run summary, and `git grep "allow("` finds
+everything that can reach production. `init` creates this one for you.
 
 `url` is a prefix. Keep it as narrow as the eval allows: a path, not a host.
 
@@ -29,7 +34,7 @@ otherwise hide that the agent reached for an upstream nobody decided on.
 ```
 eve-mocks
   ✓ mocked    linear 10, notion 6
-  → allowed   ai-gateway.vercel.sh 14
+  → allowed   model-gateway 14
   ✗ blocked   logs.example.com 1
 ```
 

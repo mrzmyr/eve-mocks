@@ -497,6 +497,11 @@ function init({ dir }: { readonly dir: string }): void {
       join(dir, "vercel-connect.ts"),
       `import { vercelConnect } from "eve-mocks";\n\nexport default vercelConnect();\n`,
     );
+    // Evals need a real model, so the first run would always end blocked without it.
+    writeFileSync(
+      join(dir, "model-gateway.ts"),
+      `import { allow } from "eve-mocks";\n\n// Stays real: evals need a model. One file per allowed upstream; delete it to block the gateway too.\nexport default allow({ url: "https://ai-gateway.vercel.sh/" });\n`,
+    );
     console.log(`created ${dir}`);
   }
 

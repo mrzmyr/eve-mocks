@@ -88,7 +88,7 @@ export type CallRecord = {
    * `blocked`: neither mocked nor allowed, so the call threw.
    */
   readonly outcome: "mocked" | "allowed" | "blocked";
-  /** Mock file name for a mocked call, else the host that was called. */
+  /** Name of the mock or allow entry that matched, else the host that was called. */
   readonly target: string;
   /** Tool an MCP `tools/call` named. Absent for every other request. */
   readonly tool?: string;
