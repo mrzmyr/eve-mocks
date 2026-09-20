@@ -4,8 +4,8 @@ One file per upstream in `mocks/`. Each default-exports a mock, and its file
 name is the mock's name in `list` and in the run summary.
 
 ```sh
-bun run mocks add linear     # writes mocks/linear.ts from the eve connection
-bun run mocks pull linear    # saves the upstream's schema to mocks/schemas/
+bunx eve-mocks add linear     # writes mocks/linear.ts from the eve connection
+bunx eve-mocks pull linear    # saves the upstream's schema to mocks/schemas/
 ```
 
 ## MCP
@@ -77,13 +77,34 @@ path; the mock's file name decides it:
 <!-- /site:filetree -->
 
 ```sh
-bun run mocks pull           # every mock with a remote schema
-bun run mocks pull notion    # one mock
+bunx eve-mocks pull           # every mock with a remote schema
+bunx eve-mocks pull notion    # one mock
 ```
 
 Commit `mocks/schemas/`. Evals then run offline, and a changed tool description
-arrives as a diff. An upstream that needs a sign-in or a token:
-[Authentication](authentication.md#pull-from-a-protected-upstream).
+arrives as a diff.
+
+### Protected upstreams
+
+`pull` is the one command that calls a real upstream, so it is the one that may
+need a credential. It runs on your machine, never in CI.
+
+| The upstream | Do this |
+| --- | --- |
+| MCP server with OAuth | Nothing. The first pull opens the browser, later pulls reuse the token. |
+| needs a static token | `bunx eve-mocks pull events --header "Authorization: Bearer $TOKEN"` |
+| token should stay out of the command line | give the mock `headers`, below |
+
+```ts
+defineHttpMock({
+  url: "https://events.example.com/",
+  spec: "https://events.example.com/openapi.json",
+  headers: async () => ({ "x-api-key": process.env.EVENTS_API_KEY ?? "" }),
+});
+```
+
+`headers` is sent by `pull` only, never to a mocked request. `--header` needs
+the mock's name, so a token goes to one upstream and never to all of them.
 
 ## Checks
 

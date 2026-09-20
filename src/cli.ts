@@ -648,12 +648,6 @@ function init({ dir }: { readonly dir: string }): void {
     console.log(`script ${name} now accepts ${MOCKS_FLAG}`);
   }
 
-  // `bun run mocks list` reads better than `bunx eve-mocks list`, and pins the local version.
-  if (scripts.mocks === undefined) {
-    scripts.mocks = "eve-mocks";
-    console.log("script mocks added: bun run mocks list");
-  }
-
   manifest.scripts = scripts;
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }

@@ -44,7 +44,7 @@ const PAGES: readonly Page[] = [
     source: "docs/authentication.md",
     slug: "authentication",
     title: "Authentication",
-    description: "Mock the token endpoints, and pull a schema from a protected upstream.",
+    description: "A connection signs in before it calls its upstream. Mock that request too.",
   },
   {
     source: "docs/allow.md",
@@ -70,7 +70,7 @@ const PAGES: readonly Page[] = [
     slug: "ci",
     group: "Reference",
     title: "Run in CI",
-    description: "The workflow, the secrets you still need, the coverage gate, and the run report.",
+    description: "One job, no services to start. The questions that come up are answered below.",
   },
   {
     source: "docs/constraints.md",
@@ -116,6 +116,88 @@ function toRoutes({ markdown }: { readonly markdown: string }): string {
 
   // The example lives on GitHub, not on the site.
   return out.replaceAll("(example)", "(https://github.com/mrzmyr/eve-mocks/tree/main/example)");
+}
+
+const ESC = "\u001B[";
+
+/** Wrap `text` in an ANSI style, as the CLI's `styleText` does. */
+function paint({ text, code }: { readonly text: string; readonly code: number }): string {
+  return `${ESC}${code}m${text}${ESC}0m`;
+}
+
+/**
+ * Colour the CLI output in the docs the way a terminal shows it. The README
+ * keeps plain text, which is what GitHub can render; on the site a fence
+ * without a language that holds CLI output becomes an `ansi` block, which
+ * Shiki highlights from the escape codes. See https://shiki.style/languages#ansi
+ */
+function toAnsi({ markdown }: { readonly markdown: string }): string {
+  // Fences are paired by walking the lines: a regex would pair one block's
+  // closing fence with the next block's opening one.
+  const out: string[] = [];
+  let fence: { readonly opener: string; readonly body: string[] } | undefined;
+
+  for (const line of markdown.split("\n")) {
+    if (fence === undefined) {
+      if (line.startsWith("```")) {
+        fence = { opener: line, body: [] };
+      } else {
+        out.push(line);
+      }
+
+      continue;
+    }
+
+    if (line !== "```") {
+      fence.body.push(line);
+      continue;
+    }
+
+    const isOutput = fence.opener === "```" && /✓ mocked|→ allowed|✗ blocked|^eve-mocks/m.test(fence.body.join("\n"));
+
+    if (isOutput) {
+      out.push("```ansi", ...fence.body.map((row) => paintLine({ line: row })), "```");
+    } else {
+      out.push(fence.opener, ...fence.body, "```");
+    }
+
+    fence = undefined;
+  }
+
+  return out.join("\n");
+}
+
+/** One line of CLI output with the terminal's colours. */
+function paintLine({ line }: { readonly line: string }): string {
+  return (
+    line
+      // Title of the run summary, and the section titles of `list`.
+      .replace(/^(eve-mocks)(  .*)$/, (_m, title: string, rest: string) => {
+        return paint({ text: title, code: 1 }) + paint({ text: rest, code: 2 });
+      })
+      .replace(/^(eve connections|other upstreams)$/, (_m, title: string) => {
+        return paint({ text: title, code: 1 });
+      })
+      // The detail after a row's count, the report line, and the hints.
+      .replace(/^(  .*\S\s+\d+)(   \S.*)$/, (_m, row: string, detail: string) => {
+        return row + paint({ text: detail, code: 2 });
+      })
+      .replace(/^(  report\s+.*)$/, (_m, report: string) => {
+        return paint({ text: report, code: 2 });
+      })
+      .replace(/( \(dynamic\))$/, (_m, note: string) => {
+        return paint({ text: note, code: 2 });
+      })
+      .replace(/^(\s+)(why:|fix:)/, (_m, pad: string, label: string) => {
+        return pad + paint({ text: label, code: 2 });
+      })
+      .replace(/^(eve-mocks:)/, (_m, prefix: string) => {
+        return paint({ text: prefix, code: 31 });
+      })
+      .replaceAll("✓ mocked", paint({ text: "✓ mocked", code: 32 }))
+      .replaceAll("→ allowed", paint({ text: "→ allowed", code: 33 }))
+      .replaceAll("✗ blocked", paint({ text: "✗ blocked", code: 31 }))
+  );
 }
 
 /**
@@ -234,7 +316,7 @@ for (const page of PAGES) {
   }
 
   const markdown = readFileSync(join(ROOT, page.source), "utf8");
-  const body = toComponents({ markdown: toRoutes({ markdown: dropTitle({ markdown }) }) });
+  const body = toAnsi({ markdown: toComponents({ markdown: toRoutes({ markdown: dropTitle({ markdown }) }) }) });
   const frontMatter = `---\ntitle: ${JSON.stringify(page.title)}\ndescription: ${JSON.stringify(page.description)}\n---\n\n`;
 
   writeFileSync(join(dir, `${page.slug}.mdx`), `${frontMatter}${body}`);

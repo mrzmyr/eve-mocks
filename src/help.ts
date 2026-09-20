@@ -128,9 +128,9 @@ Examples
 
   init: `eve-mocks init [--dir <path>]
 
-Create the mocks directory, route the app's \`dev\` and \`eval\` scripts in
-package.json through \`eve-mocks --\`, and add a \`mocks\` script for this CLI.
-Safe to rerun: existing files and scripts are left alone.
+Create the mocks directory and route the app's \`dev\` and \`eval\` scripts in
+package.json through \`eve-mocks --\`. Safe to rerun: existing files and already
+wrapped scripts are left alone.
 
 Examples
   eve-mocks init

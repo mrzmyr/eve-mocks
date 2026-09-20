@@ -41,8 +41,7 @@ wrapper. Without `--mocks` those scripts still run untouched, against the real
 APIs.
 
 ```json
-"eval": "eve-mocks -- eve eval",
-"mocks": "eve-mocks"
+"eval": "eve-mocks -- eve eval"
 ```
 
 Until the package is on npm, link it from a clone instead: see
@@ -52,7 +51,7 @@ Until the package is on npm, link it from a clone instead: see
 
 ```sh
 bunx eve info          # compiles the app, so eve-mocks can read its connections
-bun run mocks list
+bunx eve-mocks list
 ```
 
 ```
@@ -66,7 +65,7 @@ Every connection starts `blocked`: under `--mocks` a call to it throws. Pick one
 ### 3. Add Mock
 
 ```sh
-bun run mocks add linear
+bunx eve-mocks add linear
 ```
 
 Writes the mock with that connection's production URL and type, read from
@@ -80,7 +79,7 @@ eve's own manifest.
 ### 4. Pull Schema
 
 ```sh
-bun run mocks pull linear
+bunx eve-mocks pull linear
 ```
 
 Saves the server's real tool list (MCP) or OpenAPI document (HTTP). Run it once
@@ -176,8 +175,8 @@ eve-mocks  25 calls, none blocked
 
 ## Next Steps
 
-- **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and the checks before a run.
-- **[Authentication](docs/authentication.md)**: mock token endpoints, and pull from a protected upstream.
+- **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, protected upstreams, and the checks before a run.
+- **[Authentication](docs/authentication.md)**: what to do when a connection's sign-in is blocked.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a blocked call does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
 - **[FAQ](docs/faq.md)**: several specs on one host, local spec files, dynamic connections, and more.

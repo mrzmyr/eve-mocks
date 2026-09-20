@@ -13,32 +13,36 @@
 That is the whole job. No service containers, no ports to wait for, no fixtures
 to seed.
 
-## Schemas are committed, not pulled
+<!-- site:accordion -->
 
-`pull` is the one command that calls a real upstream, and it runs on your
-machine. CI reads `mocks/schemas/` from the repository, so it needs neither the
-upstreams nor their credentials. A changed tool description then arrives as a
-diff in a pull request instead of as an eval that fails on one machine.
+### Do I run `pull` in CI?
 
-## A blocked call fails the run
+No. Schemas are committed, not pulled. `pull` is the one command that calls a
+real upstream, and it runs on your machine. CI reads `mocks/schemas/` from the
+repository, so it needs neither the upstreams nor their credentials. A changed
+tool description then arrives as a diff in a pull request instead of as an eval
+that fails on one machine.
 
-A run whose command exited 0 still exits 1 when any call was blocked. Without
-that, a model that recovers from the thrown error hides the fact that the agent
-reached for an upstream nobody decided on, and the eval passes anyway.
+### Why did CI fail when every eval passed?
+
+A call was blocked. A run whose command exited 0 still exits 1 when the agent
+called an upstream that is neither mocked nor allowed. Without that, a model
+that recovers from the thrown error hides it, and the eval passes anyway. The
+summary names each blocked host and the fix.
 
 Opt out with `--no-fail-on-blocked`, in the wrapped command or before `--`.
 
-## Secrets
+### Which secrets does CI need?
 
-Only the upstreams you [allow](allow.md) need one, usually just the model gateway.
-Connection credentials are not needed, because the token endpoints are mocked
-and each connection's real token code still runs against them. See
-[token endpoints](authentication.md#token-endpoints).
+Only those of the upstreams you [allow](allow.md), usually just the model
+gateway. Connection credentials are not needed: the
+[token endpoints](authentication.md) are mocked, and each connection's real
+token code runs against them.
 
-## The run report
+### Where do I see what the agent called?
 
-Every run under `--mocks` writes `.eve-mocks/report.json`, which holds the
-latest run:
+In `.eve-mocks/report.json`, which every run under `--mocks` writes. The
+workflow above uploads it as an artifact.
 
 ```json
 {
@@ -52,20 +56,21 @@ latest run:
 
 `tools` counts MCP `tools/call` by tool name, which answers "did the agent call
 `create_issue`?". The call log of that run sits next to it, one JSON object per
-line; the last 10 runs are kept. The folder ignores itself in git, so no app
-has to touch its own `.gitignore`.
+line; the last 10 runs are kept. The folder ignores itself in git.
 
-## Fail when a connection has no mock
+### How do I fail when a connection has no mock yet?
 
 The run only reports what the agent happened to call. To fail on a connection
-that nobody has mocked yet, before any eval runs:
+nobody has mocked, before any eval runs:
 
 ```yaml
 - run: bunx eve info
 - run: bunx eve-mocks list --json | jq -e '[.[] | select(.isConnection and .status == "blocked")] | length == 0'
 ```
 
-## Logs
+### Why is there no colour in the CI log?
 
-Colour is dropped when the output is not a terminal and when `NO_COLOR` is set,
-so the summary stays readable in a CI log. Icons stay either way.
+Colour is dropped when the output is not a terminal and when `NO_COLOR` is set.
+The icons stay, so the summary reads the same.
+
+<!-- /site:accordion -->

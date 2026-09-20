@@ -1,54 +1,51 @@
 # Authentication
 
-Two separate things need credentials in production: the agent's connections at
-run time, and `pull` when it reads a protected upstream. Under `--mocks` only
-the second one ever needs a real credential.
+A connection signs in before it calls its upstream: it asks a token endpoint
+for a token, then sends that token along. Under `--mocks` the sign-in request is
+blocked like any other:
 
-## Token endpoints
+```
+eve-mocks  2 calls, 1 blocked
 
-Mock the endpoint that issues tokens, and every connection's real token code
-still runs. No connection needs a mock branch, and CI needs no client secret.
+  ✗ blocked   auth.example.com     1
+
+  report      .eve-mocks/report.json
+```
+
+Mock the token endpoint, and the connection's own auth code runs unchanged. It
+gets `mock-token`, and the mocked upstream accepts any token.
 
 ```ts
 // mocks/auth.ts
-import { oauthToken, vercelConnect } from "eve-mocks";
+import { oauthToken } from "eve-mocks";
 
-export default [vercelConnect(), oauthToken({ url: "https://auth.example.com/oauth/token" })];
+export default oauthToken({ url: "https://auth.example.com/oauth/token" });
 ```
 
-| Helper | Mocks |
-| --- | --- |
-| `vercelConnect()` | the [Vercel Connect](https://vercel.com/docs/connect) token endpoint |
-| `oauthToken({ url })` | any OAuth 2.0 token endpoint; answers `access_token: "mock-token"` |
+```
+eve-mocks  4 calls, none blocked
 
-## Pull from a protected upstream
+  ✓ mocked    auth       1
+              linear     3   get_issue 3
 
-`pull` is the one command that calls a real upstream, and it runs on your
-machine. How it signs in depends on the upstream.
-
-**An MCP server with OAuth** needs nothing: the first pull opens the browser,
-and later pulls reuse the token.
-
-```sh
-bun run mocks pull linear
+  report      .eve-mocks/report.json
 ```
 
-**A static token** goes in `--header`. It needs the mock's name, so a token is
-sent to one upstream and never to all of them:
+You change nothing in the connection, and no client secret is needed, not
+locally and not in CI.
 
-```sh
-bun run mocks pull events --header "Authorization: Bearer $TOKEN"
-```
+## Vercel Connect
 
-**To keep it out of the command line**, give the mock `headers`. They are sent
-by `pull` only, never to a mocked request:
+A connection that gets its token from
+[Vercel Connect](https://vercel.com/docs/connect) needs `vercelConnect()`
+instead:
 
 ```ts
-defineHttpMock({
-  url: "https://events.example.com/",
-  spec: "https://events.example.com/openapi.json",
-  headers: async () => ({ "x-api-key": process.env.EVENTS_API_KEY ?? "" }),
-});
+// mocks/vercel-connect.ts
+import { vercelConnect } from "eve-mocks";
+
+export default vercelConnect();
 ```
 
-When auth is missing, the error says which of these to use.
+Signing in to download a schema is a different topic:
+[pull from a protected upstream](mocks.md#protected-upstreams).
