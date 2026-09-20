@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -5,6 +6,14 @@ import { createError } from "./errors.ts";
 import { getClosest } from "./get-closest.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
 import type { Mock, MockContext, PullOptions, ToolResult } from "./types.ts";
+
+/**
+ * The official MCP inspector, run through npx at pull time. It implements the
+ * OAuth sign-in hosted MCP servers require (browser flow, token stored in
+ * `~/.mcp-inspector`), which the SDK client leaves to its caller.
+ * See https://github.com/modelcontextprotocol/inspector
+ */
+const INSPECTOR = "@modelcontextprotocol/inspector";
 
 /** A tool as `tools/list` returns it. The model reads all three fields. */
 type Tool = {
@@ -29,27 +38,28 @@ type Tool = {
  *
  * @param input.url - Production MCP endpoint to intercept, and what
  *   `eve-mocks pull` reads the real `tools/list` from.
- * @param input.results - Answer per tool. Every served tool needs one and
- *   every key must name a pulled tool; `check` enforces both.
- * @param input.omit - Pulled tools the mock does not list, such as the
- *   mutations a read-only connection never allows.
- * @param input.pull - How `eve-mocks pull` authenticates against `url`.
+ * @param input.results - Answer per tool. The mock lists exactly the tools
+ *   that have one, so a read-only connection's mock never lists the upstream's
+ *   mutations. Every key must name a tool of the schema file; `check`
+ *   enforces it. eve filters tools by the connection's allow-list anyway, so a
+ *   tool without a result is one the model could not call.
+ * @param input.pull - Static headers for `eve-mocks pull`, for a server that
+ *   takes a bearer token. A server behind OAuth needs none: the pull signs in
+ *   through the browser.
  */
 export function defineMcpMock({
   url,
   results,
-  omit = [],
   pull,
 }: {
   readonly url: string;
   readonly results: Readonly<Record<string, ToolResult>>;
-  readonly omit?: readonly string[];
   readonly pull?: PullOptions;
 }): Mock {
   let served: readonly Tool[] | undefined;
 
   /**
-   * Pulled tools the mock serves: all but the omitted ones.
+   * Pulled tools the mock serves: the ones with a result.
    *
    * @throws MockError when the schema file was never pulled.
    */
@@ -71,7 +81,7 @@ export function defineMcpMock({
 
     served = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools.filter(
       (tool) => {
-        return !omit.includes(tool.name);
+        return results[tool.name] !== undefined;
       },
     );
 
@@ -122,63 +132,80 @@ export function defineMcpMock({
       return transport.handleRequest(request);
     },
     check: async (context) => {
-      const names = loadTools(context).map(({ name }) => {
+      const served = loadTools(context).map(({ name }) => {
         return name;
       });
 
-      for (const name of names) {
-        if (results[name] === undefined) {
-          throw createError({
-            status: 500,
-            message: `No result for tool "${name}" of ${url}`,
-            why: "The schema file lists it, so the model can call it, and the mock could not answer",
-            fix: `Add results.${name}, or leave the tool out with omit: ["${name}"]`,
-          });
-        }
-      }
-
       for (const name of Object.keys(results)) {
-        if (!names.includes(name)) {
-          throw createError({
-            status: 500,
-            message: `Result "${name}" names no tool of ${url}`,
-            why: "The schema file lists no such tool, or omit removes it, so this result can never be called",
-            fix: `Did you mean ${getClosest({ value: name, candidates: names })}? Else refresh the schema file with eve-mocks pull`,
-          });
+        if (served.includes(name)) {
+          continue;
         }
+
+        const path = getSchemaPath({ name: context.name, kind: "tools" });
+        const all = (JSON.parse(readFileSync(path, "utf8")) as { readonly tools: Tool[] }).tools;
+        const closest = getClosest({
+          value: name,
+          candidates: all.map((tool) => {
+            return tool.name;
+          }),
+        });
+
+        throw createError({
+          status: 500,
+          message: `Result "${name}" names no tool of ${url}`,
+          why: "The schema file lists no such tool, so the mock would never list it and this result can never be called",
+          fix: `Did you mean ${closest}? Else refresh the schema file with eve-mocks pull ${context.name}`,
+        });
       }
     },
-    pull: async ({ name }) => {
-      const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
-      const { StreamableHTTPClientTransport } = await import(
-        "@modelcontextprotocol/sdk/client/streamableHttp.js"
-      );
-      const client = new Client({ name: "eve-mocks-pull", version: "1.0.0" });
-      const transport = new StreamableHTTPClientTransport(new URL(url), {
-        requestInit: { headers: (await pull?.headers?.()) ?? {} },
+    pull: async ({ name, headers }) => {
+      const merged = { ...(await pull?.headers?.()), ...headers };
+      const args = ["-y", INSPECTOR, "--cli", url, "--transport", "http", "--method", "tools/list"];
+
+      for (const [key, value] of Object.entries(merged)) {
+        args.push("--header", `${key}: ${value}`);
+      }
+
+      // stdin is inherited and stderr forwarded: the inspector's browser
+      // sign-in needs a TTY on one of them, and prints its prompts on stderr.
+      const child = spawn("npx", args, { stdio: ["inherit", "pipe", "pipe"] });
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+        process.stderr.write(chunk);
       });
 
-      try {
-        // The SDK types `sessionId` as optional, which clashes with its own
-        // `Transport` under `exactOptionalPropertyTypes`.
-        await client.connect(transport as Parameters<typeof client.connect>[0]);
-        const listed = await client.listTools();
-        const path = getSchemaPath({ name, kind: "tools" });
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, `${JSON.stringify({ tools: listed.tools }, null, 2)}\n`);
+      const code = await new Promise<number | null>((resolve) => {
+        child.on("close", resolve);
+      });
 
-        return path;
-      } catch (cause) {
+      if (code !== 0) {
+        let fix = `Pass the server's auth header: eve-mocks pull ${name} --header "Authorization: Bearer <token>", or set pull.headers in the mock file`;
+
+        // The inspector's own code for "needs a browser sign-in, has no terminal".
+        if (stderr.includes("auth_required")) {
+          fix = `The server uses OAuth. Run eve-mocks pull ${name} once in a terminal to sign in through the browser; the token is stored in ~/.mcp-inspector and later pulls, agent or CI, reuse it. For a static token instead: --header "Authorization: Bearer <token>"`;
+        }
+
         throw createError({
           status: 502,
           message: `tools/list failed for ${url}`,
-          why: "The real MCP server refused the connection or the request",
-          fix: "Check the credentials pull.headers reads; a server behind user OAuth needs a bearer token of a signed-in user",
-          cause,
+          why: `The MCP inspector exited with code ${code}; its output is above`,
+          fix,
         });
-      } finally {
-        await client.close();
       }
+
+      const path = getSchemaPath({ name, kind: "tools" });
+      const listed = JSON.parse(stdout) as { readonly tools: readonly Tool[] };
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, `${JSON.stringify({ tools: listed.tools }, null, 2)}\n`);
+
+      return path;
     },
   };
 }

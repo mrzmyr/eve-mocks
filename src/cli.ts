@@ -6,6 +6,7 @@
  *                                              the command carries --mocks
  *   eve-mocks list [--dir mocks]               every mock and the URL it claims
  *   eve-mocks pull [name] [--dir mocks]        refresh schemas from the real upstreams
+ *                 [--header "Name: value"]     auth for a protected upstream, repeatable
  *   eve-mocks add <name> [--dir mocks]         scaffold a mock for an eve connection
  *   eve-mocks init [--dir mocks]               mocks folder + package.json scripts
  */
@@ -199,8 +200,38 @@ async function list({ dir }: { readonly dir: string }): Promise<void> {
   }
 }
 
+/** `--header "Name: value"` flags as a header record. */
+function parseHeaders({ flags }: { readonly flags: readonly string[] }): Record<string, string> {
+  const headers: Record<string, string> = {};
+
+  for (const flag of flags) {
+    const separator = flag.indexOf(":");
+
+    if (separator < 1) {
+      throw createError({
+        status: 400,
+        message: `Cannot read --header "${flag}"`,
+        why: "A header is a name and a value separated by a colon",
+        fix: 'Pass it as --header "Authorization: Bearer <token>"',
+      });
+    }
+
+    headers[flag.slice(0, separator).trim()] = flag.slice(separator + 1).trim();
+  }
+
+  return headers;
+}
+
 /** Refresh the schema file of one mock, or of every mock that names a source. */
-async function pull({ dir, name }: { readonly dir: string; readonly name: string | undefined }): Promise<void> {
+async function pull({
+  dir,
+  name,
+  headers,
+}: {
+  readonly dir: string;
+  readonly name: string | undefined;
+  readonly headers: Readonly<Record<string, string>>;
+}): Promise<void> {
   const { mocks } = await loadMocks({ dir });
   const selected = mocks.filter((entry) => {
     return name === undefined || entry.name === name;
@@ -220,7 +251,7 @@ async function pull({ dir, name }: { readonly dir: string; readonly name: string
   // One upstream being down or unauthenticated must not stop the others.
   for (const entry of selected) {
     try {
-      const path = await entry.mock.pull?.({ name: entry.name });
+      const path = await entry.mock.pull?.({ name: entry.name, headers });
 
       if (path === undefined) {
         console.log(`${entry.name.padEnd(24)}skipped: no schema source`);
@@ -250,12 +281,7 @@ function createScaffold({ name, url, protocol }: { readonly name: string; readon
 export default defineMcpMock({
   url: "${url}",
   // Pull its tools/list with: eve-mocks pull ${name}
-  pull: {
-    headers: async () => {
-      return { authorization: \`Bearer \${process.env.${name.toUpperCase().replaceAll("-", "_")}_TOKEN}\` };
-    },
-  },
-  // One result per pulled tool; eve-mocks names the missing ones.
+  // The mock lists the tools that have a result here.
   results: {},
 });
 `;
@@ -365,7 +391,10 @@ function init({ dir }: { readonly dir: string }): void {
 const { values, positionals, tokens } = parseArgs({
   allowPositionals: true,
   tokens: true,
-  options: { dir: { type: "string", default: "mocks" } },
+  options: {
+    dir: { type: "string", default: "mocks" },
+    header: { type: "string", multiple: true, default: [] },
+  },
 });
 const dir = resolve(values.dir);
 
@@ -385,7 +414,7 @@ try {
   } else if (name === "list") {
     await list({ dir });
   } else if (name === "pull") {
-    await pull({ dir, name: target });
+    await pull({ dir, name: target, headers: parseHeaders({ flags: values.header }) });
   } else if (name === "add") {
     add({ dir, name: target });
   } else if (name === "init") {

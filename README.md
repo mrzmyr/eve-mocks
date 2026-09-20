@@ -51,20 +51,22 @@ import { defineMcpMock } from "eve-mocks";
 
 export default defineMcpMock({
   url: "https://tracker.example.com/mcp",
-  // Pulled tools the mock does not list, such as mutations a read-only connection never allows.
-  omit: ["create_issue"],
-  pull: {
-    headers: async () => ({ authorization: `Bearer ${process.env.TRACKER_TOKEN}` }),
-  },
   results: {
     get_issue: (args) => ({ identifier: String(args.id), title: "Stale numbers" }),
+    list_teams: () => ({ teams: [TEAM] }),
   },
 });
 ```
 
-The schema file carries the real tool names, descriptions, and input schemas. The model
-reads them, so a paraphrased description makes an eval test a different prompt
-than production.
+The schema file carries the real tool names, descriptions, and input schemas.
+The model reads them, so a paraphrased description makes an eval test a
+different prompt than production.
+
+The mock lists exactly the tools that have a result. A hosted server's real
+`tools/list` can hold dozens of tools, mutations included; a read-only
+connection that allows 20 of them gets a mock with 20 results, which lists 20
+tools. eve filters tools by the connection's
+allow-list anyway, so a tool without a result is one the model could not call.
 
 **REST upstream**, from pinned routes, its pulled OpenAPI document (3.0
 or 3.1), or both:
@@ -119,12 +121,11 @@ its schema file. A mismatch stops the run with the nearest valid name:
 eve-mocks: Route POST /v1/serach matches no operation of https://api.notion.com/
   fix: Did you mean POST /v1/search? Paths use the spec's {param} syntax and methods are upper-case
 
-eve-mocks: No result for tool "list_initiatives" of https://tracker.example.com/mcp
-  fix: Add results.list_initiatives, or leave the tool out with omit: ["list_initiatives"]
+eve-mocks: Result "get_isue" names no tool of https://tracker.example.com/mcp
+  fix: Did you mean get_issue? Else refresh the schema file with eve-mocks pull tracker
 ```
 
-So a refreshed schema file with a new tool fails the next run until someone
-writes its result. A schema file that was never pulled stops the run too:
+A schema file that was never pulled stops the run too:
 
 ```
 eve-mocks: No schema for notion at mocks/schemas/notion.openapi.json
@@ -140,11 +141,42 @@ eve-mocks pull notion     # one mock
 eve-mocks add catalog     # scaffold mocks/catalog.ts from eve's manifest
 ```
 
-`pull` downloads a REST mock's `source`, and the real `tools/list` of an MCP
-mock's `url`, into `mocks/schemas/`. One failing upstream does not stop the others.
-`pull.headers` authenticates the request and must be self-contained: read the
-environment, do not import app code. A server behind user OAuth needs a
-signed-in user's bearer token.
+`pull` writes into `mocks/schemas/`. One failing upstream does not stop the
+others.
+
+- **REST**: downloads the mock's `source`. A public spec needs nothing else.
+- **MCP**: runs the official
+  [MCP inspector](https://github.com/modelcontextprotocol/inspector) through
+  `npx` and saves its `tools/list`. The inspector does the OAuth sign-in hosted
+  servers require: the first pull in a terminal opens the browser, the token
+  lands in `~/.mcp-inspector`, and later pulls reuse it, from an agent or CI too.
+
+Auth for a protected upstream comes from `--header`, from the mock file, or
+both; the flag wins:
+
+```sh
+eve-mocks pull events --header "x-api-key: $SECRET"
+eve-mocks pull pager --header "Authorization: Bearer $TOKEN"
+```
+
+```ts
+defineHttpMock({
+  url: "https://events.example.com/",
+  source: "https://events.example.com/openapi.json",
+  pull: { headers: async () => ({ "x-api-key": process.env.SECRET ?? "" }) },
+});
+```
+
+`pull.headers` must be self-contained: read the environment, do not import app
+code. When auth is missing, the error says which of the two to use:
+
+```
+tracker                  failed: tools/list failed for https://tracker.example.com/mcp
+  fix: The server uses OAuth. Run eve-mocks pull tracker once in a terminal to sign in through the browser; …
+
+events                  failed: OpenAPI spec download failed for https://…/openapi.json
+  fix: Check the source URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" …
+```
 
 `add` knows a static connection's protocol and URL from the manifest. A dynamic
 connection has neither there; write its mock by hand.

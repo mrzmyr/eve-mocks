@@ -14,6 +14,10 @@ type Node = { readonly [key: string]: unknown };
 /** HTTP methods an OpenAPI path item can declare, as `Request.method` spells them. */
 const METHODS = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE"];
 
+/** What to try when a spec download fails; most failures are missing auth. */
+const AUTH_HINT =
+  'Check the source URL. If the spec is protected, pass its auth header: eve-mocks pull <name> --header "Name: value" (repeatable), or set pull.headers in the mock file';
+
 /** Whether `value` is a JSON object, not an array or `null`. */
 function isNode(value: unknown): value is Node {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -144,7 +148,8 @@ function toResponse(result: unknown): Response {
  *
  * @param input.url - Production URL prefix the paths hang off.
  * @param input.source - URL of the upstream's OpenAPI JSON.
- * @param input.pull - How `eve-mocks pull` authenticates against `source`.
+ * @param input.pull - How `eve-mocks pull` authenticates against `source`;
+ *   `--header` flags add to it and win.
  * @param input.routes - Pinned answers, path then method. With a schema file,
  *   every route must name an operation it declares; `check` enforces it.
  */
@@ -307,7 +312,7 @@ export function defineHttpMock({
         }
       }
     },
-    pull: async ({ name }) => {
+    pull: async ({ name, headers }) => {
       if (source === undefined) {
         return undefined;
       }
@@ -316,7 +321,7 @@ export function defineHttpMock({
         // `redirect: "error"`: a protected spec redirects to a login page, which
         // would otherwise be followed and fail later as unparseable JSON.
         const response = await fetch(source, {
-          headers: (await pull?.headers?.()) ?? {},
+          headers: { ...(await pull?.headers?.()), ...headers },
           redirect: "error",
         });
 
@@ -325,7 +330,7 @@ export function defineHttpMock({
             status: 502,
             message: `OpenAPI spec download failed for ${source}`,
             why: `The server answered ${response.status}`,
-            fix: "Check the source URL and the credentials pull.headers reads",
+            fix: AUTH_HINT,
           });
         }
 
@@ -342,8 +347,8 @@ export function defineHttpMock({
         throw createError({
           status: 502,
           message: `OpenAPI spec download failed for ${source}`,
-          why: "The server answered with a redirect, non-JSON body, or another fetch error",
-          fix: "Check the source URL and the credentials pull.headers reads",
+          why: "The server answered with a redirect, non-JSON body, or another fetch error; a protected spec redirects to its login page",
+          fix: AUTH_HINT,
           cause,
         });
       }

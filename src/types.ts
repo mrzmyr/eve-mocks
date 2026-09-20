@@ -31,7 +31,13 @@ export type Mock = {
    *
    * @returns The path written, or `undefined` when the mock names no source.
    */
-  readonly pull?: (context: MockContext) => Promise<string | undefined>;
+  readonly pull?: (context: PullContext) => Promise<string | undefined>;
+};
+
+/** What `eve-mocks pull` tells a mock. */
+export type PullContext = MockContext & {
+  /** Headers from `--header` flags. They win over the mock's `pull.headers`. */
+  readonly headers: Readonly<Record<string, string>>;
 };
 
 /** How `eve-mocks pull` reaches the real upstream. */

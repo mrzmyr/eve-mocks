@@ -8,6 +8,7 @@ export type {
   CallRecord,
   Mock,
   MockContext,
+  PullContext,
   PullOptions,
   RouteContext,
   RouteHandler,
