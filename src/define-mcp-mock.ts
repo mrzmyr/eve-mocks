@@ -16,6 +16,9 @@ import type { Mock, MockContext, ToolResult } from "./types.ts";
  */
 const INSPECTOR = "@modelcontextprotocol/inspector";
 
+/** The inspector's lint summary on stderr: `Schema portability: 0 errors, 24 warnings across 10 tools.` */
+const LINT_SUMMARY = /Schema portability: (\d+) errors?, (\d+) warnings?/;
+
 /** A tool as `tools/list` returns it. The model reads all three fields. */
 type Tool = {
   readonly name: string;
@@ -176,8 +179,21 @@ export function defineMcpMock({
         stdout += chunk.toString();
       });
       child.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-        process.stderr.write(chunk);
+        const text = chunk.toString();
+
+        stderr += text;
+
+        // The lint summary is reported through `onLint`; its `--strict` hint names an inspector flag, not one of this CLI.
+        const rest = text
+          .split("\n")
+          .filter((line) => {
+            return !LINT_SUMMARY.test(line);
+          })
+          .join("\n");
+
+        if (rest.trim() !== "") {
+          process.stderr.write(rest);
+        }
       });
 
       const code = await new Promise<number | null>((resolve, reject) => {
@@ -228,6 +244,12 @@ export function defineMcpMock({
 
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, `${JSON.stringify({ tools: listed.tools }, null, 2)}\n`);
+
+      const lint = LINT_SUMMARY.exec(stderr);
+
+      if (lint !== null) {
+        context.onLint?.({ errors: Number(lint[1]), warnings: Number(lint[2]) });
+      }
 
       return [path];
     },

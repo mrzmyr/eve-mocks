@@ -194,7 +194,7 @@ describe("cli", () => {
     const { status, stderr } = run({ args: ["--", "no-such-command-eve-mocks"] });
 
     expect(status).toBe(127);
-    expect(stderr).toContain("fix:");
+    expect(stderr).toContain("  fix  ");
   });
 
   test("refuses pull --header without a mock name, so a token goes to one upstream only", () => {
