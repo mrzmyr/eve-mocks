@@ -1,0 +1,1 @@
+- You MUST follow coding standards, see `.agents/skills/coding-standards/SKILL.md`
