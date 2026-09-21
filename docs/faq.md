@@ -14,8 +14,10 @@ locally and not in CI.
 ```
 ❅ eve-mocks  4 calls, no block
 
-  ✓ mock      sign-in     1   answered by default
-              linear      3   get_issue 3
+  ✓ mock             4
+  ├─ linear          3
+  │  └─ get_issue    3
+  └─ sign-in         1   answered by default
 
   report      .eve-mocks/report.json
 ```

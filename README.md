@@ -138,8 +138,12 @@ bun run eval --mocks
 ```
 ❅ eve-mocks  5 calls, 2 block
 
-  ✓ mock      linear             3   get_issue 3
-  ✗ block     api.notion.com     2   connection "notion"
+  ✓ mock                3
+  └─ linear             3
+     └─ get_issue       3
+
+  ✗ block               2
+  └─ api.notion.com     2   connection "notion"
 
   report      .eve-mocks/report.json
 ```
@@ -160,8 +164,12 @@ A green run has no `block` row. Commit `mocks/`:
 ```
 ❅ eve-mocks  5 calls, no block
 
-  ✓ mock      linear     3   get_issue 3
-  → allow     notion     2
+  ✓ mock             3
+  └─ linear          3
+     └─ get_issue    3
+
+  → allow            2
+  └─ notion          2
 
   report      .eve-mocks/report.json
 ```
