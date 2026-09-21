@@ -33,23 +33,11 @@ different topic: [pull from a protected upstream](mocks.md#protected-upstreams).
 
 ### Why does eve dev reach api.vercel.com under --mocks?
 
-`eve dev` is eve's interactive TUI. Its credential gate and CLI telemetry talk
-to `api.vercel.com` and `telemetry.vercel.com`. Those are eve's own hosts, not
-the agent's upstreams, so eve-mocks allows them by default when the wrapped
-command is `eve dev`. They show in the run summary as `eve-dev`:
-
-```
-❅ eve-mocks  5 calls, no block
-
-  → allow            5
-  └─ eve-dev         5   allowed by default under eve dev
-
-  report      .eve-mocks/report.json
-```
-
-A mock or an [allow](allow.md) entry for the same URL wins. To override, write
-your own mock for the URL. The sign-in default still answers Vercel Connect
-token requests, so a connection sign-in is never sent to the real endpoint.
+The TUI's credential gate and CLI telemetry live on `api.vercel.com` and
+`telemetry.vercel.com`, eve's own hosts. Under a wrapped `eve dev` they pass by
+default, shown as `eve-dev` in the run summary. A mock or an
+[allow](allow.md) entry for the same URL wins, and a connection sign-in still
+gets `mock-token`.
 
 ### My token endpoint sends no `grant_type`. Why is it blocked?
 
