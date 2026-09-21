@@ -73,6 +73,14 @@ function formatOutcome({
   return styleText(OUTCOME_COLORS[outcome], `${OUTCOME_ICONS[outcome]} ${OUTCOME_LABELS[outcome]}`.padEnd(width), { stream });
 }
 
+/** Lines of the run summary's tree: a row, the last row of its parent, and the line that passes a row's children. */
+const BRANCH = "├─ ";
+const LAST_BRANCH = "└─ ";
+const TRUNK = "│  ";
+
+/** Row for the calls to an MCP upstream that named no tool, such as `initialize` and `tools/list`. */
+const OTHER = "other";
+
 /** Label of each upstream type in `list`. */
 const TYPE_LABELS = { mcp: "MCP", http: "HTTP" } as const;
 
@@ -88,9 +96,9 @@ function formatCount({ count, noun }: { readonly count: number; readonly noun: s
 /**
  * Print what was mocked, what went to a real upstream, and what was blocked.
  *
- * One titled block on stderr, in the icons and colours of `list`, one row per
- * upstream. The title tells the block apart from the wrapped command's own
- * output, so its rows need no prefix.
+ * One titled block on stderr, in the icons and colours of `list`: a tree of
+ * outcome, upstream, and MCP tool, each with its count. The title tells the
+ * block apart from the wrapped command's own output, so its rows need no prefix.
  *
  * @param input.notes - Text after a target's count, by target: the connection a blocked host belongs to.
  */
@@ -115,38 +123,85 @@ function printReport({
 
   console.error(`\n${styleText("bold", `${MARK} eve-mocks`, { stream })}  ${styleText("dim", headline, { stream })}\n`);
 
+  // A tree: outcome, then upstream, then MCP tool. Every count shares one column.
+  const groups = (["mock", "allow", "block"] as const).flatMap((outcome) => {
+    const rows = report.targets
+      .filter((entry) => {
+        return entry.outcome === outcome;
+      })
+      .map(({ target, calls, tools = {} }) => {
+        const children = Object.entries(tools).sort(([, a], [, b]) => {
+          return b - a;
+        });
+        const named = children.reduce((sum, [, count]) => {
+          return sum + count;
+        }, 0);
+
+        // Requests that named no tool, such as `initialize` and `tools/list`, so the children add up.
+        if (children.length > 0 && calls > named) {
+          children.push([OTHER, calls - named]);
+        }
+
+        return { target, calls, children };
+      });
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    return [{ outcome, rows }];
+  });
+
   const width = Math.max(
-    ...report.targets.map(({ target }) => {
-      return target.length;
+    ...groups.flatMap(({ rows }) => {
+      return rows.flatMap(({ target, children }) => {
+        return [
+          BRANCH.length + target.length,
+          ...children.map(([tool]) => {
+            return BRANCH.length * 2 + tool.length;
+          }),
+        ];
+      });
     }),
-    0,
+    // Widest outcome label: `✓ allow`.
+    7,
   );
 
-  for (const outcome of ["mock", "allow", "block"] as const) {
-    const rows = report.targets.filter((entry) => {
-      return entry.outcome === outcome;
-    });
+  for (const [groupIndex, { outcome, rows }] of groups.entries()) {
+    if (groupIndex > 0) {
+      console.error("");
+    }
 
-    for (const [index, { target, calls, tools = {} }] of rows.entries()) {
-      // The outcome labels a group once; the rows below it line up under the first.
-      let label = " ".repeat(12);
+    console.error(
+      `  ${formatOutcome({ outcome, width, stream })}  ${styleText("bold", String(report.counts[outcome]).padStart(4), { stream })}`,
+    );
 
-      if (index === 0) {
-        label = formatOutcome({ outcome, width: 12, stream });
+    for (const [rowIndex, { target, calls, children }] of rows.entries()) {
+      // The last row of a group closes its line, and its tools hang below a blank instead of a trunk.
+      let branch = BRANCH;
+      let trunk = TRUNK;
+
+      if (rowIndex === rows.length - 1) {
+        branch = LAST_BRANCH;
+        trunk = " ".repeat(TRUNK.length);
       }
 
-      const detail =
-        notes.get(target) ??
-        Object.entries(tools)
-          .sort(([, a], [, b]) => {
-            return b - a;
-          })
-          .map(([tool, count]) => {
-            return `${tool} ${count}`;
-          })
-          .join(", ");
+      const gap = " ".repeat(width - branch.length - target.length);
+      const note = styleText("dim", notes.get(target) ?? "", { stream });
 
-      console.error(`  ${label}${target.padEnd(width)}  ${String(calls).padStart(4)}   ${styleText("dim", detail, { stream })}`.trimEnd());
+      console.error(`  ${styleText("dim", branch, { stream })}${target}${gap}  ${String(calls).padStart(4)}   ${note}`.trimEnd());
+
+      for (const [childIndex, [tool, count]] of children.entries()) {
+        let prefix = `${trunk}${BRANCH}`;
+
+        if (childIndex === children.length - 1) {
+          prefix = `${trunk}${LAST_BRANCH}`;
+        }
+
+        const name = `${tool}${" ".repeat(width - prefix.length - tool.length)}  ${String(count).padStart(4)}`;
+
+        console.error(`  ${styleText("dim", `${prefix}${name}`, { stream })}`);
+      }
     }
   }
 

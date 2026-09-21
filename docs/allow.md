@@ -37,10 +37,17 @@ reached for an upstream nobody decided on.
 ```
 ❅ eve-mocks  31 calls, 1 block
 
-  ✓ mock      linear              10   get_issue 6, list_teams 4
-              notion               6
-  → allow     ai-gateway          14
-  ✗ block     logs.example.com     1   connection "logs"
+  ✓ mock                 16
+  ├─ linear              10
+  │  ├─ get_issue         6
+  │  └─ list_teams        4
+  └─ notion               6
+
+  → allow                14
+  └─ ai-gateway          14
+
+  ✗ block                 1
+  └─ logs.example.com     1   connection "logs"
 
   report      .eve-mocks/report.json
 

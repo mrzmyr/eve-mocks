@@ -175,6 +175,12 @@ describe("cli", () => {
     expect(readFileSync(join(APP_ROOT, ".eve-mocks/.gitignore"), "utf8")).toBe("*\n");
   });
 
+  test("prints the run as a tree of outcome, upstream, and MCP tool", () => {
+    const { stderr } = run({ args: ["--", "node", "agent.mjs", "--mocks"], cwd: APP_ROOT });
+
+    expect(stderr).toContain(["  ✓ mock              1", "  └─ shop             1", "     └─ get_order     1"].join("\n"));
+  });
+
   test("keeps a timestamped report per run next to its log", () => {
     expect(run({ args: ["--", "node", "agent.mjs", "--mocks"], cwd: APP_ROOT }).status).toBe(0);
 
