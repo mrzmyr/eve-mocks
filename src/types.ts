@@ -53,10 +53,20 @@ export type Mock = {
   readonly pull?: (context: PullContext) => Promise<readonly string[]>;
 };
 
+/** What the MCP inspector's schema lint counted over a pulled `tools/list`. */
+export type PullLint = {
+  /** Schemas a client could not use. */
+  readonly errors: number;
+  /** Schemas some clients read differently. */
+  readonly warnings: number;
+};
+
 /** What `eve-mocks pull` tells a mock. */
 export type PullContext = MockContext & {
   /** Headers from `--header` flags, such as auth for a protected upstream. */
   readonly headers: Readonly<Record<string, string>>;
+  /** Receives the lint counts of a pulled document, which the CLI prints with the files written. */
+  readonly onLint?: (lint: PullLint) => void;
 };
 
 /** What a route handler receives. */

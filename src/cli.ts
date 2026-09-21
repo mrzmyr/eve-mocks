@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, styleText } from "node:util";
 
@@ -23,7 +23,7 @@ import { readManifest } from "./read-manifest.ts";
 import { createLog, STATE_DIR, writeReport, type Report } from "./report.ts";
 import { resolveConnections } from "./resolve-connections.ts";
 import { SIGN_IN } from "./sign-in.ts";
-import type { CallRecord } from "./types.ts";
+import type { CallRecord, PullLint } from "./types.ts";
 
 /**
  * The preload, as a file URL so a path with spaces survives `NODE_OPTIONS`.
@@ -91,6 +91,81 @@ function formatCount({ count, noun }: { readonly count: number; readonly noun: s
   }
 
   return `${count} ${noun}s`;
+}
+
+/** A path as typed from the working directory: shorter than the absolute one, and it pastes into a command. */
+function formatPath({ path }: { readonly path: string }): string {
+  return relative(process.cwd(), path) || ".";
+}
+
+/** Lines of a diff, in the colours of `git diff`: `+` for what a command wrote, `-` for what it replaced. */
+function formatDiff({ sign, text }: { readonly sign: "+" | "-"; readonly text: string }): string {
+  let color: "green" | "red" = "green";
+
+  if (sign === "-") {
+    color = "red";
+  }
+
+  return styleText(color, `  ${sign} ${text}`);
+}
+
+/** The command to run next, below what a command did. */
+function formatNext({ command }: { readonly command: string }): string {
+  return `\n${styleText("dim", "  next  ")}${command}`;
+}
+
+/** `text` broken at spaces into lines of at most `width` characters. */
+function wrap({ text, width }: { readonly text: string; readonly width: number }): string[] {
+  const lines: string[] = [];
+  let line = "";
+
+  for (const word of text.split(" ")) {
+    if (line !== "" && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+      continue;
+    }
+
+    line = line === "" ? word : `${line} ${word}`;
+  }
+
+  return [...lines, line];
+}
+
+/** Columns an error is wrapped to: the terminal's, capped so a wide one stays readable. */
+const ERROR_WIDTH = 100;
+
+/**
+ * Print a {@link MockError} on stderr: the summary in red, then `why` and `fix`
+ * as two labelled blocks whose lines all start in one column. `why` is prose
+ * and is wrapped; `fix` holds commands and keeps its own line breaks.
+ */
+function printError({ error }: { readonly error: MockError }): void {
+  const stream = process.stderr;
+  const label = "  why  ";
+  const indent = " ".repeat(label.length);
+  const width = Math.min(stream.columns ?? ERROR_WIDTH, ERROR_WIDTH) - label.length;
+
+  console.error(`${styleText(["red", "bold"], "✗ eve-mocks", { stream })}  ${styleText("bold", error.summary, { stream })}\n`);
+
+  for (const [name, lines] of [
+    ["why", wrap({ text: error.why, width })],
+    ["fix", error.fix.split("\n")],
+  ] as const) {
+    for (const [index, line] of lines.entries()) {
+      let prefix = indent;
+
+      if (index === 0) {
+        prefix = styleText("dim", `  ${name}  `, { stream });
+      }
+
+      console.error(`${prefix}${line}`.trimEnd());
+    }
+  }
+
+  if (error.link !== undefined) {
+    console.error(`${styleText("dim", "  docs ", { stream })}${error.link}`);
+  }
 }
 
 /**
@@ -251,6 +326,9 @@ function createBlockError({
   readonly report: Report;
   readonly connections: ReadonlyMap<string, string>;
 }): MockError {
+  const stream = process.stderr;
+
+  // Per blocked host: its name, then the two ways out, labelled in the colours of their outcomes.
   const fixes = report.targets
     .filter(({ outcome }) => {
       return outcome === "block";
@@ -258,20 +336,26 @@ function createBlockError({
     .flatMap(({ target, url }) => {
       const { protocol, host } = new URL(url);
       const connection = connections.get(target);
-      const allowLine = `allow it in mocks/<name>.ts: export default allow({ url: "${protocol}//${host}/" })`;
+      const file = `mocks/${connection ?? "<name>"}.ts`;
+      let mock = `${file}: export default defineHttpMock({ url: "${protocol}//${host}/" })`;
 
       if (connection !== undefined) {
-        return [`${target}: mock it with eve-mocks add ${connection} && eve-mocks pull ${connection}`, `  or ${allowLine}`];
+        mock = `eve-mocks add ${connection} && eve-mocks pull ${connection}`;
       }
 
-      return [`${target}: mock it in mocks/<name>.ts with defineHttpMock({ url: "${protocol}//${host}/" })`, `  or ${allowLine}`];
+      return [
+        styleText("bold", target, { stream }),
+        `  ${styleText(OUTCOME_COLORS.mock, "mock it ", { stream })}  ${mock}`,
+        `  ${styleText(OUTCOME_COLORS.allow, "allow it", { stream })}  ${file}: export default allow({ url: "${protocol}//${host}/" })`,
+        "",
+      ];
     });
 
   return createError({
     status: 403,
     message: `${formatCount({ count: report.counts.block, noun: "block" })} failed the run`,
     why: "The command succeeded, but the agent called an upstream that is neither mocked nor allowed, and a model that recovers from the thrown error would hide that",
-    fix: [...fixes, `To let such a run pass, add ${ALLOW_BLOCK_FLAG}`].join("\n       "),
+    fix: [...fixes, `To let such a run pass, add ${ALLOW_BLOCK_FLAG}`].join("\n"),
   });
 }
 
@@ -316,7 +400,7 @@ function start({
       cause,
     });
 
-    console.error(`eve-mocks: ${error.message}`);
+    printError({ error });
     process.exit(127);
   });
 
@@ -416,7 +500,8 @@ async function run({
     });
 
     if (exitCode === 0 && blocked.length > 0 && shouldFailOnBlock && !command.includes(ALLOW_BLOCK_FLAG)) {
-      console.error(`\neve-mocks: ${createBlockError({ report, connections }).message}`);
+      console.error("");
+      printError({ error: createBlockError({ report, connections }) });
       process.exit(1);
     }
 
@@ -484,7 +569,8 @@ async function list({ dir, isJson }: { readonly dir: string; readonly isJson: bo
   }
 
   if (missing) {
-    console.error(`\neve-mocks: ${missing.message}`);
+    console.error("");
+    printError({ error: missing });
   }
 }
 
@@ -503,11 +589,12 @@ function printSections({ rows }: { readonly rows: readonly Coverage[] }): void {
     }),
   });
 
-  const legend = (["mock", "allow", "block"] as const).map((outcome) => {
-    return `${formatOutcome({ outcome, width: 0 })}: ${OUTCOME_LEGEND[outcome]}`;
-  });
+  // One outcome per line: side by side they outgrow an 80 column terminal.
+  console.log(styleText("dim", `under ${MOCKS_FLAG}`));
 
-  console.log(styleText("dim", "under --mocks: ") + legend.join(styleText("dim", " · ")));
+  for (const outcome of ["mock", "allow", "block"] as const) {
+    console.log(`  ${formatOutcome({ outcome, width: 10 })}${styleText("dim", OUTCOME_LEGEND[outcome])}`);
+  }
 }
 
 /** `--header "Name: value"` flags as a header record. */
@@ -530,6 +617,95 @@ function parseHeaders({ flags }: { readonly flags: readonly string[] }): Record<
   }
 
   return headers;
+}
+
+/** Tool names `pull` prints before it sums up the rest: a hosted server lists dozens. */
+const LISTED_TOOLS = 12;
+
+/** Tool names per printed line. */
+const TOOL_COLUMNS = 3;
+
+/** Tool names of a pulled `tools/list` file; none for any other document, such as an OpenAPI spec. */
+function readToolNames({ path }: { readonly path: string }): string[] {
+  try {
+    const { tools } = JSON.parse(readFileSync(path, "utf8")) as { readonly tools?: readonly { readonly name: string }[] };
+
+    return (tools ?? []).map(({ name }) => {
+      return name;
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Print what one mock pulled: its name, the tools of a `tools/list`, what the
+ * inspector's schema lint counted, one count per line, and the files written.
+ */
+function printPulled({
+  name,
+  paths,
+  lint,
+}: {
+  readonly name: string;
+  readonly paths: readonly string[];
+  readonly lint: PullLint | undefined;
+}): void {
+  if (paths.length === 0) {
+    console.log(`${styleText("bold", name)}  ${styleText("dim", "skipped: nothing remote to pull")}`);
+    return;
+  }
+
+  const tools = paths.flatMap((path) => {
+    return readToolNames({ path });
+  });
+  let title = styleText("bold", name);
+
+  if (tools.length > 0) {
+    title = `${title}  ${styleText("dim", formatCount({ count: tools.length, noun: "tool" }))}`;
+  }
+
+  console.log(title);
+
+  const listed = tools.slice(0, LISTED_TOOLS);
+  const column =
+    Math.max(
+      0,
+      ...listed.map((tool) => {
+        return tool.length;
+      }),
+    ) + 2;
+
+  for (let index = 0; index < listed.length; index += TOOL_COLUMNS) {
+    const line = listed
+      .slice(index, index + TOOL_COLUMNS)
+      .map((tool) => {
+        return tool.padEnd(column);
+      })
+      .join("");
+
+    console.log(`  ${line}`.trimEnd());
+  }
+
+  if (tools.length > listed.length) {
+    console.log(styleText("dim", `  … and ${tools.length - listed.length} more`));
+  }
+
+  if (lint !== undefined) {
+    const paint = (count: number, color: "red" | "yellow"): string => {
+      return count > 0 ? styleText(color, String(count)) : styleText("dim", String(count));
+    };
+
+    console.log("");
+    console.log(`${styleText("dim", "  errors    ")}${paint(lint.errors, "red")}`);
+    console.log(`${styleText("dim", "  warnings  ")}${paint(lint.warnings, "yellow")}${styleText("dim", "  schema portability, from the MCP inspector")}`);
+  }
+
+  console.log("");
+
+  for (const path of paths) {
+    console.log(styleText("dim", `  saved     ${formatPath({ path })}`));
+  }
 }
 
 /** Refresh the schema files of one mock, or of every mock with something remote to pull. */
@@ -571,22 +747,25 @@ async function pull({
   // One upstream being down or unauthenticated must not stop the others.
   for (const entry of selected) {
     try {
-      const paths = (await entry.mock.pull?.({ name: entry.name, headers })) ?? [];
+      let lint: PullLint | undefined;
+      const paths =
+        (await entry.mock.pull?.({
+          name: entry.name,
+          headers,
+          onLint: (found) => {
+            lint = found;
+          },
+        })) ?? [];
 
-      if (paths.length === 0) {
-        console.log(`${entry.name.padEnd(24)}skipped: nothing remote to pull`);
-      }
-
-      for (const path of paths) {
-        console.log(`${entry.name.padEnd(24)}${path}`);
-      }
+      printPulled({ name: entry.name, paths, lint });
     } catch (error) {
       if (!(error instanceof MockError)) {
         throw error;
       }
 
       hasFailed = true;
-      console.error(`${entry.name.padEnd(24)}failed: ${error.message}`);
+      console.error(styleText("bold", entry.name, { stream: process.stderr }));
+      printError({ error });
     }
   }
 
@@ -668,14 +847,21 @@ async function add({ dir, name }: { readonly dir: string; readonly name: string 
   }
 
   writeFileSync(path, createScaffold({ name, url: connection.url, protocol: connection.protocol }));
-  console.log(`created ${path}`);
+  console.log(formatDiff({ sign: "+", text: formatPath({ path }) }));
+
+  if (connection.protocol === "mcp") {
+    console.log(formatNext({ command: `eve-mocks pull ${name}` }));
+  }
 }
 
 /** Create the mocks folder and route the app's eve scripts through `eve-mocks --`. */
 function init({ dir }: { readonly dir: string }): void {
+  let hasChanged = false;
+
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
-    console.log(`created ${dir}`);
+    console.log(formatDiff({ sign: "+", text: `${formatPath({ path: dir })}/` }));
+    hasChanged = true;
   }
 
   const manifestPath = resolve("package.json");
@@ -693,6 +879,8 @@ function init({ dir }: { readonly dir: string }): void {
     scripts?: Record<string, string>;
   };
   const scripts = manifest.scripts ?? {};
+  const skipped: string[] = [];
+  let hasTitle = false;
 
   for (const name of PROXIED_SCRIPTS) {
     const script = scripts[name];
@@ -704,16 +892,36 @@ function init({ dir }: { readonly dir: string }): void {
     // The shell splits a chained script before this CLI runs, so only its
     // first command would be wrapped.
     if (script.includes("&&") || script.includes(";") || script.includes("|")) {
-      console.log(`skipped script ${name}: wrap the command that starts eve by hand`);
+      skipped.push(name);
       continue;
     }
 
     scripts[name] = `eve-mocks -- ${script}`;
-    console.log(`script ${name} now accepts ${MOCKS_FLAG}`);
+
+    // The file name once, above the first changed line, the way a diff names its file.
+    if (!hasTitle) {
+      console.log(`${hasChanged ? "\n" : ""}${styleText("bold", "  package.json")}`);
+      hasTitle = true;
+    }
+
+    console.log(formatDiff({ sign: "-", text: `"${name}": ${JSON.stringify(script)}` }));
+    console.log(formatDiff({ sign: "+", text: `"${name}": ${JSON.stringify(scripts[name])}` }));
+    hasChanged = true;
+  }
+
+  for (const name of skipped) {
+    console.log(`${styleText("yellow", "  ! ")}script ${name} chains commands: wrap the one that starts eve with eve-mocks -- by hand`);
+  }
+
+  if (!hasChanged) {
+    console.log(styleText("dim", "  nothing to do: the mocks folder exists and the scripts are wrapped"));
+    return;
   }
 
   manifest.scripts = scripts;
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  console.log(formatNext({ command: "eve-mocks list" }));
 }
 
 /** Print what `getInfo` found, for a person or as JSON. */
@@ -823,7 +1031,7 @@ function fail({ error: thrown, isJson }: { readonly error: unknown; readonly isJ
   if (isJson) {
     console.error(JSON.stringify({ error: { status, message: summary, why, fix, link } }));
   } else {
-    console.error(`eve-mocks: ${error.message}`);
+    printError({ error });
   }
 
   let code = 1;

@@ -51,9 +51,11 @@ reached for an upstream nobody decided on.
 
   report      .eve-mocks/report.json
 
-eve-mocks: 1 block failed the run
-  fix: logs.example.com: mock it with eve-mocks add logs && eve-mocks pull logs
-         or allow it in mocks/<name>.ts: export default allow({ url: "https://logs.example.com/" })
+✗ eve-mocks  1 block failed the run
+
+  fix  logs.example.com
+         mock it   eve-mocks add logs && eve-mocks pull logs
+         allow it  mocks/logs.ts: export default allow({ url: "https://logs.example.com/" })
 ```
 
 To let such a run pass anyway:
