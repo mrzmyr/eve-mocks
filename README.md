@@ -1,6 +1,8 @@
 # eve-mocks
 
-Run an [eve](https://eve.dev/docs) agent and its evals with no credentials and
+Mocks for [eve](https://eve.dev/docs) agents.
+
+Run an eve agent and its evals with no credentials and
 no calls to production. Mocks answer inside the agent's own processes: no
 servers, no ports, no mock branches in connection code.
 

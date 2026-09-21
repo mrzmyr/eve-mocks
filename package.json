@@ -19,7 +19,8 @@
   },
   "files": [
     "dist",
-    "docs"
+    "docs",
+    "LICENSE"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
@@ -46,7 +47,7 @@
   "engines": {
     "node": ">=22.15"
   },
-  "homepage": "https://github.com/mrzmyr/eve-mocks#readme",
+  "homepage": "https://eve-mocks.vercel.app",
   "bugs": {
     "url": "https://github.com/mrzmyr/eve-mocks/issues"
   },
