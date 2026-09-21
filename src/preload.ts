@@ -13,12 +13,13 @@
 import { appendFileSync, readFileSync } from "node:fs";
 
 import { createError } from "./errors.ts";
+import { EVE_DEV, isEveDevUrl } from "./eve-dev.ts";
 import { guardNodeHttp } from "./guard-node-http.ts";
 import { loadMocks, type LoadedMocks } from "./load-mocks.ts";
 import { getSignIn, SIGN_IN, SIGN_IN_ENV } from "./sign-in.ts";
 import type { CallRecord } from "./types.ts";
 
-const { EVE_MOCKS_DIR, EVE_MOCKS_LOG } = process.env;
+const { EVE_MOCKS_DIR, EVE_MOCKS_LOG, EVE_MOCKS_EVE_DEV } = process.env;
 
 if (EVE_MOCKS_DIR === undefined) {
   throw createError({
@@ -64,6 +65,14 @@ guardNodeHttp({
 
     if (pass) {
       logCall({ outcome: "allow", target: pass.name, method, url });
+      return;
+    }
+
+    // After user allow entries: a mock cannot answer node:http, but a user
+    // allow for the same URL still wins. Sign-in is fetch-only, so it is not
+    // in this path.
+    if (EVE_MOCKS_EVE_DEV !== undefined && isEveDevUrl({ url })) {
+      logCall({ outcome: "allow", target: EVE_DEV, method, url });
       return;
     }
 
@@ -193,6 +202,13 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (signIn) {
     logCall({ outcome: "mock", target: SIGN_IN, method, url });
     return signIn.handle(request, { name: SIGN_IN });
+  }
+
+  // After the sign-in default, so a connection sign-in to the Vercel Connect
+  // token endpoint still gets mock-token instead of reaching production.
+  if (EVE_MOCKS_EVE_DEV !== undefined && isEveDevUrl({ url })) {
+    logCall({ outcome: "allow", target: EVE_DEV, method, url });
+    return realFetch(input, init);
   }
 
   logCall({ outcome: "block", target: host, method, url });

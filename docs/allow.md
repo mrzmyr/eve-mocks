@@ -73,3 +73,17 @@ bun run eval --mocks --no-fail-on-block
 
 A mock wins over an allow entry for the same URL. Requests through `node:http`
 are blocked but never mocked: see [Constraints](constraints.md#only-fetch-is-mocked).
+
+## Allowed by default under eve dev
+
+When the wrapped command is `eve dev`, two hosts pass without an allow entry:
+`api.vercel.com` and `telemetry.vercel.com`. They are eve's own machinery, not
+the agent's upstreams. The TUI's credential gate walks `GET /v2/user`,
+`/v1/teams`, `/v2/teams/{id}`, and `/v9/projects/{id}` on `api.vercel.com`, each
+retried when blocked, and the CLI posts telemetry to
+`telemetry.vercel.com/api/vercel-cli/v1/events`.
+
+This applies only when the wrapped command is `eve dev`. A user mock or allow
+entry for the same URL wins. The [sign-in
+default](faq.md#do-i-have-to-mock-a-connections-sign-in) still answers Vercel
+Connect token requests (`api.vercel.com/v1/connect/token/`) with `mock-token`.

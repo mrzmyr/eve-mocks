@@ -84,6 +84,22 @@ writeFileSync(
    await fetch("https://login.example.com/users", { method: "POST", body: "{}" }).catch(() => console.log("plain POST blocked"));`,
 );
 
+// A fake eve CLI, run as `node eve dev`: one Vercel Connect sign-in, then one
+// call to eve's own telemetry. An async IIFE, so the extensionless file runs
+// as CommonJS under plain Node. The catch keeps the test independent of the
+// network: the allow row is logged before the real fetch happens.
+writeFileSync(
+  join(APP_ROOT, "eve"),
+  `(async () => {
+     const connect = await fetch("https://api.vercel.com/v1/connect/token/linear", { method: "POST" });
+     console.log((await connect.json()).token);
+     await fetch("https://telemetry.vercel.com/api/vercel-cli/v1/events", { method: "POST", body: "{}" }).then(
+       () => { console.log("control-plane PASSED"); },
+       (error) => { console.log(error.message.startsWith("eve-mocks block") ? "control-plane BLOCKED" : "control-plane PASSED"); },
+     );
+   })();`,
+);
+
 /** Run the CLI on Node, as its shebang does; in an empty app root unless `cwd` names another. */
 function run({ args, cwd = EMPTY_ROOT }: { readonly args: readonly string[]; readonly cwd?: string }) {
   return spawnSync("node", [join(import.meta.dir, "cli.ts"), ...args], { cwd, encoding: "utf8" });
@@ -242,6 +258,31 @@ describe("cli", () => {
 
     expect(stdout.trim().split("\n")).toEqual(["mock-token mock-token", "plain POST blocked"]);
     expect(stderr).toContain("answered by default");
+    expect(status).toBe(1);
+  });
+
+  test("allows eve's control plane by default under eve dev, and the sign-in default still wins", () => {
+    const { stdout, stderr, status } = run({ args: ["--", "node", "eve", "dev", "--mocks"], cwd: APP_ROOT });
+
+    expect(stdout.trim().split("\n")).toEqual(["mock-token", "control-plane PASSED"]);
+    expect(stderr).toContain("allowed by default under eve dev");
+    expect(status).toBe(0);
+
+    const report = JSON.parse(readFileSync(join(APP_ROOT, ".eve-mocks/report.json"), "utf8")) as {
+      targets: { outcome: string; target: string }[];
+    };
+    const outcomes = report.targets.map(({ outcome, target }) => {
+      return `${outcome} ${target}`;
+    });
+
+    expect(outcomes).toContain("allow eve-dev");
+    expect(outcomes).toContain("mock sign-in");
+  });
+
+  test("still blocks eve's control plane under any other command", () => {
+    const { stdout, status } = run({ args: ["--", "node", "eve", "eval", "--mocks"], cwd: APP_ROOT });
+
+    expect(stdout.trim().split("\n")).toEqual(["mock-token", "control-plane BLOCKED"]);
     expect(status).toBe(1);
   });
 
