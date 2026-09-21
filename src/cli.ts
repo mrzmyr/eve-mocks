@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs, styleText } from "node:util";
 
 import { createError, MockError } from "./errors.ts";
+import { EVE_DEV, isEveDevCommand } from "./eve-dev.ts";
 import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getCoverage, type Coverage } from "./get-coverage.ts";
@@ -462,19 +463,25 @@ async function run({
   const startedAt = new Date();
   const log = createLog({ root, startedAt });
 
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    EVE_MOCKS_DIR: dir,
+    EVE_MOCKS_LOG: log,
+    NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${PRELOAD.href}`].filter(Boolean).join(" "),
+    // Bun ignores NODE_OPTIONS. See https://bun.com/docs/runtime/bunfig#preload
+    BUN_OPTIONS: [process.env.BUN_OPTIONS, `--preload=${fileURLToPath(PRELOAD)}`].filter(Boolean).join(" "),
+  };
+
+  if (isEveDevCommand({ command: [file, ...args] })) {
+    // eve's TUI talks to Vercel for its own credential gate and telemetry;
+    // those are not agent upstreams. The preload allows them only when this is set.
+    env.EVE_MOCKS_EVE_DEV = "1";
+  }
+
   const child = start({
     file,
     args,
-    env: {
-      ...process.env,
-      EVE_MOCKS_DIR: dir,
-      EVE_MOCKS_LOG: log,
-      NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${PRELOAD.href}`].filter(Boolean).join(" "),
-      // Bun ignores NODE_OPTIONS. See https://bun.com/docs/runtime/bunfig#preload
-      BUN_OPTIONS: [process.env.BUN_OPTIONS, `--preload=${fileURLToPath(PRELOAD)}`]
-        .filter(Boolean)
-        .join(" "),
-    },
+    env,
   });
 
   child.on("exit", async (code) => {
@@ -493,6 +500,7 @@ async function run({
       report,
       notes: new Map([
         [SIGN_IN, "answered by default"],
+        [EVE_DEV, "allowed by default under eve dev"],
         ...[...connections].map(([host, name]): [string, string] => {
           return [host, `connection "${name}"`];
         }),

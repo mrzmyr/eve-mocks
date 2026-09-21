@@ -31,6 +31,14 @@ A mock or an [allow](allow.md) entry for the same URL wins, so allowing a token
 endpoint still reaches the real one. Signing in to download a schema is a
 different topic: [pull from a protected upstream](mocks.md#protected-upstreams).
 
+### Why does eve dev reach api.vercel.com under --mocks?
+
+The TUI's credential gate and CLI telemetry live on `api.vercel.com` and
+`telemetry.vercel.com`, eve's own hosts. Under a wrapped `eve dev` they pass by
+default, shown as `eve-dev` in the run summary. A mock or an
+[allow](allow.md) entry for the same URL wins, and a connection sign-in still
+gets `mock-token`.
+
 ### My token endpoint sends no `grant_type`. Why is it blocked?
 
 Only a request with `grant_type` is recognised as a sign-in. Any other token
