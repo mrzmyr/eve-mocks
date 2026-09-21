@@ -25,8 +25,12 @@ import { resolveConnections } from "./resolve-connections.ts";
 import { SIGN_IN } from "./sign-in.ts";
 import type { CallRecord } from "./types.ts";
 
-/** The preload, as a file URL so a path with spaces survives `NODE_OPTIONS`. */
-const PRELOAD = new URL("./preload.ts", import.meta.url);
+/**
+ * The preload, as a file URL so a path with spaces survives `NODE_OPTIONS`.
+ * It sits next to this file with the same extension: `.ts` in the source tree,
+ * `.js` in the published build.
+ */
+const PRELOAD = new URL(import.meta.url.endsWith(".ts") ? "./preload.ts" : "./preload.js", import.meta.url);
 
 /** Scripts `init` routes through `eve-mocks --` when the app defines them. */
 const PROXIED_SCRIPTS = ["dev", "eval"];

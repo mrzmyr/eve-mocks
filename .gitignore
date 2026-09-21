@@ -8,3 +8,4 @@ site/node_modules/
 .vercel
 site/.vercel/
 .vercel/
+dist/

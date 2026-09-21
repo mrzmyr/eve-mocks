@@ -1,26 +1,33 @@
 {
   "name": "eve-mocks",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "private": true,
-  "description": "In-process upstream mocks for eve agents: no servers, no ports, no mock branches in connection code.",
+  "description": "Mocks for eve agents",
   "license": "Apache-2.0",
   "bin": {
-    "eve-mocks": "./src/cli.ts"
+    "eve-mocks": "./dist/cli.js"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./preload": "./src/preload.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./preload": {
+      "types": "./dist/preload.d.ts",
+      "default": "./dist/preload.js"
+    }
   },
   "files": [
-    "src",
+    "dist",
     "docs"
   ],
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "link:self": "mkdir -p node_modules && ln -sfn .. node_modules/eve-mocks",
-    "example": "bun run link:self && cd example && ../src/cli.ts -- bun check.ts --mocks"
+    "example": "bun run build && bun run link:self && cd example && ../src/cli.ts -- bun check.ts --mocks"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -38,5 +45,17 @@
   "author": "Moritz Meyer",
   "engines": {
     "node": ">=22.15"
-  }
+  },
+  "homepage": "https://github.com/mrzmyr/eve-mocks#readme",
+  "bugs": {
+    "url": "https://github.com/mrzmyr/eve-mocks/issues"
+  },
+  "keywords": [
+    "eve",
+    "mocks",
+    "mcp",
+    "openapi",
+    "testing",
+    "agents"
+  ]
 }

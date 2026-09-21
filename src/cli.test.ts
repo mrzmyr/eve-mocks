@@ -106,7 +106,11 @@ describe("cli", () => {
   });
 
   test("prints the version", () => {
-    expect(run({ args: ["--version"] }).stdout.trim()).toBe("0.0.0");
+    const { version } = JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")) as {
+      version: string;
+    };
+
+    expect(run({ args: ["--version"] }).stdout.trim()).toBe(version);
   });
 
   test("exits 2 for an unknown command and hints at the nearest one", () => {
