@@ -1,5 +1,9 @@
 # eve-mocks
 
+```sh
+bun run dev --mocks    # or: bun run eval --mocks
+```
+
 Mocks for [eve](https://eve.dev/docs) agents.
 
 Run an eve agent and its evals with no credentials and
@@ -35,27 +39,17 @@ Mock one upstream end to end. The same six steps repeat for the next one.
 
 <!-- site:steps -->
 
-### 1. Install
+### 1. bunx eve-mocks init
 
-```sh
-bun add -d eve-mocks
-bunx eve-mocks init
-```
-
-`init` creates `mocks/` and sends the `dev` and `eval` scripts through the
-wrapper. Without `--mocks` those scripts still run untouched, against the real
-APIs.
+Creates `mocks/` and routes the `dev` and `eval` scripts through the wrapper
+(install first: `bun add -d eve-mocks`). Without `--mocks` they run untouched,
+against the real APIs.
 
 ```json
 "eval": "eve-mocks -- eve eval"
 ```
 
-### 2. List Mocks
-
-```sh
-bunx eve info          # compiles the app, so eve-mocks can read its connections
-bunx eve-mocks list
-```
+### 2. bunx eve-mocks list
 
 ```
 eve connections
@@ -63,40 +57,21 @@ eve connections
   notion                  ✗ block     HTTP  https://api.notion.com/
 ```
 
-Every connection starts `block`: under `--mocks` a call to it throws. Pick one.
+Every connection starts `block`: under `--mocks` a call to it throws. Pick
+one. If the list is empty, run `bunx eve info` once to compile the app.
 
-### 3. Add Mock
+### 3. bunx eve-mocks add linear
 
-```sh
-bunx eve-mocks add linear
-```
+Writes `mocks/linear.ts` with that connection's production URL and type, read
+from eve's own manifest.
 
-Writes the mock with that connection's production URL and type, read from
-eve's own manifest.
+### 4. bunx eve-mocks pull linear
 
-<!-- site:filetree -->
-- mocks/
-  - linear.ts
-<!-- /site:filetree -->
+Saves the server's real tool list (MCP) or OpenAPI spec (HTTP) to
+`mocks/schemas/linear.json`. Run it once on your machine and commit the file:
+evals then run offline, and CI never needs the upstream or its credentials.
 
-### 4. Pull Schema
-
-```sh
-bunx eve-mocks pull linear
-```
-
-Saves the server's real tool list (MCP) or OpenAPI spec (HTTP). Run it once
-on your machine and commit the file: evals then run offline, and CI never needs
-the upstream or its credentials.
-
-<!-- site:filetree -->
-- mocks/
-  - schemas/
-    - linear.json
-  - linear.ts
-<!-- /site:filetree -->
-
-### 5. Pin Results
+### 5. Create Mock
 
 Give every tool your evals use a result:
 
@@ -118,26 +93,11 @@ mid-eval. [HTTP APIs are mocked from their OpenAPI spec](docs/mocks.md#http).
 
 ### 6. Run Evals
 
-This eval reads an issue from Linear and a page from Notion:
-
-```ts
-// evals/roadmap.eval.ts
-import { defineEval } from "eve/evals";
-import { includes } from "eve/evals/expect";
-
-export default defineEval({
-  description: "Reads an issue from Linear and the roadmap page from Notion.",
-  async test(t) {
-    await t.send("What is blocking LIN-42, and is it on the Notion roadmap page?");
-    t.succeeded();
-    t.check(t.reply, includes("Checkout fails on retry"));
-  },
-});
-```
-
 ```sh
 bun run eval --mocks
 ```
+
+This run read an issue from Linear and a page from Notion:
 
 ```
 ❅ eve-mocks  5 calls, 2 block
