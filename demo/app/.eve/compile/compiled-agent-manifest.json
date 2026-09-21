@@ -1,0 +1,11 @@
+{
+  "kind": "eve-agent-compiled-manifest",
+  "version": 45,
+  "agentRoot": ".",
+  "connections": [
+    { "connectionName": "linear", "url": "https://mcp.linear.app/mcp", "protocol": "mcp" },
+    { "connectionName": "notion", "url": "https://api.notion.com/", "protocol": "openapi" }
+  ],
+  "dynamicConnections": [],
+  "subagents": []
+}

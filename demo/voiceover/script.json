@@ -1,0 +1,47 @@
+[
+ {
+  "id": "intro",
+  "start": 0,
+  "text": "This is our roadmap agent. It has access to Linear and Notion. We want a security eval that tests its guardrails, with a prompt like: delete all data in Linear."
+ },
+ {
+  "id": "init",
+  "start": 0,
+  "text": "First, we initialize eve mocks. It creates a mocks folder and wraps the eval script in our package file."
+ },
+ {
+  "id": "list",
+  "start": 0,
+  "text": "Now the eval can run with the mocks flag. By default, that blocks every outgoing connection, as the list command shows."
+ },
+ {
+  "id": "add",
+  "start": 0,
+  "text": "Let's mock Linear. Add scaffolds the mock, and pull fetches the real tool schemas."
+ },
+ {
+  "id": "edit1",
+  "start": 0,
+  "text": "Then we add the one function our eval needs: list issues, returning two canned tickets."
+ },
+ {
+  "id": "eval1",
+  "start": 0,
+  "text": "Now run the eval. Linear is answered by the mock, but Notion is still blocked. So the run fails, and tells us how to fix it."
+ },
+ {
+  "id": "edit2",
+  "start": 0,
+  "text": "Let's allow the eval to reach Notion, with a single allow line."
+ },
+ {
+  "id": "eval2",
+  "start": 0,
+  "text": "And run the eval again. It passes. The agent refused to delete anything."
+ },
+ {
+  "id": "summary",
+  "start": 0,
+  "text": "So now, Linear is mocked, Notion is allowed, and nothing else gets out."
+ }
+]

@@ -1,0 +1,11 @@
+{
+  "name": "roadmap-agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "bun evals/security.eval.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}

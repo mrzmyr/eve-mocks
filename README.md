@@ -8,6 +8,10 @@ servers, no ports, no mock branches in connection code.
 
 Under `--mocks` every request is mocked, explicitly allowed, or throws.
 
+[![A security eval for a roadmap agent: Linear mocked, Notion allowed](https://raw.githubusercontent.com/mrzmyr/eve-mocks/main/demo/demo.gif)](https://github.com/mrzmyr/eve-mocks/raw/main/demo/demo.mp4)
+
+Watch the [demo with voice-over](https://github.com/mrzmyr/eve-mocks/raw/main/demo/demo.mp4), 96 seconds.
+
 <!-- site:prompt Let your **coding agent** set up the first mock. -->
 **Prompt for your coding agent**
 
