@@ -183,7 +183,7 @@ A green run has no `block` row. Commit `mocks/`:
 ## Next Steps
 
 - **[Mocks](docs/mocks.md)**: MCP and HTTP mocks, schemas, and protected upstreams.
-- **[Mocks per eval](docs/evals.md)**: pin an answer inside one eval with `mock(t, …)`.
+- **[Mocks per eval](docs/evals.md)**: give one eval its own answers with `mock(t, …)`.
 - **[Allow](docs/allow.md)**: let a real upstream through, and what a block does.
 - **[CLI](docs/cli.md)**: every command, `--json`, and exit codes.
 - **[FAQ](docs/faq.md)**: sign-ins, several specs on one host, local spec files, and clients that do not use `fetch`.
