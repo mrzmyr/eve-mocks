@@ -26,7 +26,7 @@ Usage
 Commands
   list            every eve connection and upstream, and what a call to it does
   info            versions, paths, and counts, to check the setup
-  add <name>      scaffold mocks/<name>.ts for an eve connection
+  add <name>      scaffold mocks/<name>.ts for an eve connection and pull its schema
   pull [name]     refresh schema files from the real upstreams
   init            create the mocks folder and wrap the app's eve scripts
   help [command]  this text, or the help of one command
@@ -68,7 +68,7 @@ Exit codes
 
 Examples
   eve-mocks list --json | jq '.[] | select(.status == "block")'
-  eve-mocks add linear && eve-mocks pull linear --header "Authorization: Bearer $TOKEN"
+  eve-mocks add linear --header "Authorization: Bearer $TOKEN"
   eve-mocks -- eve eval --mocks
 
 Run eve-mocks help <command> for the details of one command.`;
@@ -110,16 +110,22 @@ Examples
   eve-mocks info
   eve-mocks info --json | jq '.problems'`,
 
-  add: `eve-mocks add <name> [--dir <path>]
+  add: `eve-mocks add <name> [--dir <path>] [--header "Name: value"]...
 
 Write mocks/<name>.ts for the eve connection <name>, with its production URL and
-protocol (mcp or openapi) filled in. Never overwrites a file. A dynamic
-connection works when its module constructs the URL while it loads; otherwise
-write the mock by hand.
+protocol (mcp or openapi) filled in, then pull an MCP server's tools/list as
+eve-mocks pull <name> does. Never overwrites a file. When the pull fails, the
+file stays; fix the cause and run eve-mocks pull <name>. A dynamic connection
+works when its module constructs the URL while it loads; otherwise write the
+mock by hand.
+
+Options
+  --header "Name: value"   auth for a protected MCP server, repeatable
 
 Examples
   eve-mocks list          # find the names with status block
-  eve-mocks add linear`,
+  eve-mocks add linear
+  eve-mocks add linear --header "Authorization: Bearer $LINEAR_TOKEN"`,
 
   pull: `eve-mocks pull [name] [--dir <path>] [--header "Name: value"]...
 

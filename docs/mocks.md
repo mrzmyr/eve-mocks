@@ -4,8 +4,8 @@ One file per upstream in `mocks/`. Each default-exports a mock, and its file
 name is the mock's name in `list` and in the run summary.
 
 ```sh
-bunx eve-mocks add linear     # writes mocks/linear.ts from the eve connection
-bunx eve-mocks pull linear    # saves the upstream's schema to mocks/schemas/
+bunx eve-mocks add linear     # writes mocks/linear.ts, pulls an MCP server's tools/list to mocks/schemas/
+bunx eve-mocks pull linear    # refreshes the schema, or pulls an HTTP mock's spec
 ```
 
 ## MCP
