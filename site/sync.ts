@@ -41,6 +41,12 @@ const PAGES: readonly Page[] = [
     description: "Mock an MCP server or an HTTP API, and keep its schema next to it.",
   },
   {
+    source: "docs/evals.md",
+    slug: "evals",
+    title: "Mocks per eval",
+    description: "Pin what one eval gets, inside the eval, with mock(t, …).",
+  },
+  {
     source: "docs/allow.md",
     slug: "allow",
     title: "Allow",

@@ -12,6 +12,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./evals": {
+      "types": "./dist/evals/index.d.ts",
+      "default": "./dist/evals/index.js"
+    },
     "./preload": {
       "types": "./dist/preload.d.ts",
       "default": "./dist/preload.js"

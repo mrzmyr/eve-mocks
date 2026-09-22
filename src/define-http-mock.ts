@@ -3,7 +3,9 @@ import { dirname, resolve } from "node:path";
 
 import { sample } from "openapi-sampler";
 
+import { askEvals } from "./ask-evals.ts";
 import { createError, MockError } from "./errors.ts";
+import { toCall } from "./evals/protocol.ts";
 import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getMocksDir } from "./get-mocks-dir.ts";
@@ -324,6 +326,18 @@ export function defineHttpMock({
       }
 
       const { template, params } = match;
+
+      // An eval's mock(t, …) first: it pins the answer for its own sessions only.
+      const pinned = await askEvals({
+        mock: context.name,
+        key: `${request.method} ${template}`,
+        call: await toCall({ request, params }),
+      });
+
+      if (pinned !== undefined) {
+        return pinned;
+      }
+
       const handler = routes[template]?.[request.method];
 
       if (handler) {
@@ -378,6 +392,13 @@ export function defineHttpMock({
 
       return Response.json(sample(getNode(media.schema), { quiet: true }, document), {
         status: Number(code),
+      });
+    },
+    operations: (context) => {
+      return Object.entries(loadSpec(context)).flatMap(([template, methods]) => {
+        return Object.keys(methods).map((method) => {
+          return `${method} ${template}`;
+        });
       });
     },
     documents: (context) => {

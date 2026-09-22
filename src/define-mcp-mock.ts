@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+import { askEvals, listEvalOperations } from "./ask-evals.ts";
 import { createError } from "./errors.ts";
 import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
@@ -55,16 +56,16 @@ export function defineMcpMock({
   readonly url: string;
   readonly results: Readonly<Record<string, ToolResult>>;
 }): Mock {
-  let served: readonly Tool[] | undefined;
+  let pulled: readonly Tool[] | undefined;
 
   /**
-   * Pulled tools the mock serves: the ones with a result.
+   * Every pulled tool.
    *
    * @throws MockError when the schema file was never pulled.
    */
   const loadTools = ({ name }: MockContext): readonly Tool[] => {
-    if (served !== undefined) {
-      return served;
+    if (pulled !== undefined) {
+      return pulled;
     }
 
     const path = getSchemaPath({ name });
@@ -78,13 +79,18 @@ export function defineMcpMock({
       });
     }
 
-    served = (readJson({ path, fix: `Pull it again: eve-mocks pull ${name}` }) as { readonly tools: Tool[] }).tools.filter(
-      (tool) => {
-        return results[tool.name] !== undefined;
-      },
-    );
+    pulled = (readJson({ path, fix: `Pull it again: eve-mocks pull ${name}` }) as { readonly tools: Tool[] }).tools;
 
-    return served;
+    return pulled;
+  };
+
+  /** The tools a session sees: the ones with a result, and the ones its eval pinned with `mock(t, …)`. */
+  const listServed = async (context: MockContext): Promise<readonly Tool[]> => {
+    const pinnedNames = await listEvalOperations({ mock: context.name });
+
+    return loadTools(context).filter((tool) => {
+      return results[tool.name] !== undefined || pinnedNames.includes(tool.name);
+    });
   };
 
   return {
@@ -105,11 +111,20 @@ export function defineMcpMock({
         { capabilities: { tools: {} } },
       );
 
-      server.setRequestHandler(ListToolsRequestSchema, () => {
-        return { tools: [...loadTools(context)] };
+      server.setRequestHandler(ListToolsRequestSchema, async () => {
+        return { tools: [...(await listServed(context))] };
       });
 
-      server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
+      server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+        const args = params.arguments ?? {};
+
+        // An eval's mock(t, …) first: it pins the answer for its own sessions only.
+        const pinned = await askEvals({ mock: context.name, key: params.name, call: { kind: "tool", args } });
+
+        if (pinned !== undefined) {
+          return { content: [{ type: "text", text: JSON.stringify(await pinned.json(), null, 2) }] };
+        }
+
         const result = results[params.name];
 
         if (!result) {
@@ -120,7 +135,7 @@ export function defineMcpMock({
         }
 
         // JSON text content: the shape MCP clients read from the hosted servers.
-        const text = JSON.stringify(result(params.arguments ?? {}), null, 2);
+        const text = JSON.stringify(result(args), null, 2);
 
         return { content: [{ type: "text", text }] };
       });
@@ -131,26 +146,22 @@ export function defineMcpMock({
 
       return transport.handleRequest(request);
     },
+    operations: (context) => {
+      return loadTools(context).map(({ name }) => {
+        return name;
+      });
+    },
     check: async (context) => {
-      const served = loadTools(context).map(({ name }) => {
+      const all = loadTools(context).map(({ name }) => {
         return name;
       });
 
       for (const name of Object.keys(results)) {
-        if (served.includes(name)) {
+        if (all.includes(name)) {
           continue;
         }
 
-        const path = getSchemaPath({ name: context.name });
-        const all = (
-          readJson({ path, fix: `Pull it again: eve-mocks pull ${context.name}` }) as { readonly tools: Tool[] }
-        ).tools;
-        const closest = getClosest({
-          value: name,
-          candidates: all.map((tool) => {
-            return tool.name;
-          }),
-        });
+        const closest = getClosest({ value: name, candidates: all });
 
         throw createError({
           status: 500,

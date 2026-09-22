@@ -105,3 +105,5 @@ bunx eve-mocks pull events --header "Authorization: Bearer $TOKEN"
 upstream and never to all of them. It is not stored anywhere.
 
 Local spec files, several specs on one host, and more: [FAQ](faq.md).
+
+One eval needs its own answer? Pin it in the eval: [Mocks per eval](evals.md).

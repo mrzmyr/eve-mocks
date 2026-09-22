@@ -8,12 +8,14 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, styleText } from "node:util";
 
 import { createError, MockError } from "./errors.ts";
 import { EVE_DEV, isEveDevCommand } from "./eve-dev.ts";
+import { PORT_ENV } from "./evals/protocol.ts";
 import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getCoverage, type Coverage } from "./get-coverage.ts";
@@ -377,6 +379,27 @@ const MOCKS_FLAG = "--mocks";
 /** Flag that lets a run with blocked calls succeed. `run` removes it before the command sees it. */
 const ALLOW_BLOCK_FLAG = "--no-fail-on-block";
 
+/** A free loopback port, for the evals' mock server. Freed again before the command starts, so a race is possible but unlikely. */
+function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+
+      probe.close(() => {
+        if (address === null || typeof address === "string") {
+          reject(new Error("No port"));
+          return;
+        }
+
+        resolve(address.port);
+      });
+    });
+  });
+}
+
 /**
  * Start the wrapped command. A command that cannot start, such as one that is
  * not installed, ends the process with 127, the shell's code for it.
@@ -467,6 +490,8 @@ async function run({
     ...process.env,
     EVE_MOCKS_DIR: dir,
     EVE_MOCKS_LOG: log,
+    // Where an eval's mock(t, …) listens; the mocks in the dev server post intercepted calls there.
+    [PORT_ENV]: String(await getFreePort()),
     NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${PRELOAD.href}`].filter(Boolean).join(" "),
     // Bun ignores NODE_OPTIONS. See https://bun.com/docs/runtime/bunfig#preload
     BUN_OPTIONS: [process.env.BUN_OPTIONS, `--preload=${fileURLToPath(PRELOAD)}`].filter(Boolean).join(" "),

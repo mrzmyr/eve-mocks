@@ -21,6 +21,14 @@ on another machine or in a container, which the preload does not reach. It is
 neither mocked nor blocked. What it may call is decided by the sandbox's own
 network policy.
 
+## `mock(t, …)` reads eve internals
+
+eve gives an eval no identity, so `mock(t, …)` wraps `t.send` and `t.session`
+to learn which sessions belong to it, and reads the session of a call from
+eve's context store, `Symbol.for("eve.context-storage")`. If a future eve
+renames that store, pinned answers stop applying and the mock file answers
+instead. See [Mocks per eval](evals.md).
+
 ## MCP mocks are stateless
 
 eve's MCP client calls tools without an `mcp-session-id` header, as the hosted
