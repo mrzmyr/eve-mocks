@@ -35,11 +35,15 @@ Docs for agents: https://eve-mocks.vercel.app/llms.txt
 bunx eve-mocks init
 ```
 
+Creates the `mocks/` folder and prefixes the `dev` and `eval` scripts in `package.json` with `eve-mocks --`.
+
 ### 2. Add Mock
 
 ```sh
 bunx eve-mocks add linear
 ```
+
+Writes `mocks/linear.ts` with the connection's URL and saves the server's tool list to `mocks/schemas/linear.json`.
 
 ### 3. Add Result
 
@@ -54,6 +58,8 @@ export default defineMcpMock({
   },
 });
 ```
+
+Answers `get_issue` for every eval, checked against the saved tool list, so a typo fails before the agent starts.
 
 ### 4. Add Eval
 
@@ -71,5 +77,7 @@ export default defineEval({
   },
 });
 ```
+
+Overrides one tool's answer for this eval only. Run it with `bun run eval --mocks`.
 
 <!-- /site:steps -->
