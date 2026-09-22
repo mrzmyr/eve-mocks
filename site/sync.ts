@@ -43,7 +43,7 @@ const PAGES: readonly Page[] = [
   {
     source: "docs/evals.md",
     slug: "evals",
-    title: "Mocks per Eval",
+    title: "Evals",
     description: "Give one eval its own mock answers with mock(t, …).",
   },
   {
