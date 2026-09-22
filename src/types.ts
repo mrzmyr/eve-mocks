@@ -38,6 +38,11 @@ export type Mock = {
    */
   readonly env?: Readonly<Record<string, string>>;
   /**
+   * Every operation the schema file declares: tool names for an MCP server,
+   * `METHOD /path` for an HTTP API. What `mock()` in an eval may name.
+   */
+  readonly operations?: (context: MockContext) => readonly string[];
+  /**
    * Checks the mock against its schema file, such as route keys against the spec.
    * The CLI runs it once before a command starts; the preload does not, so the
    * processes of a run do not each pay for it.

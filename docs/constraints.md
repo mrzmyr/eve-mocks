@@ -21,6 +21,15 @@ on another machine or in a container, which the preload does not reach. It is
 neither mocked nor blocked. What it may call is decided by the sandbox's own
 network policy.
 
+## Pinned eval answers depend on two eve internals
+
+eve gives an eval no ID, so `mock(t, …)` relies on two parts of eve that eve doesn't document:
+
+- **`t.send` and `t.session`**: eve-mocks wraps both on the eval's `t` to record which sessions the eval starts
+- **eve's context store**: eve-mocks reads the session ID of each call from `Symbol.for("eve.context-storage")`
+
+If a future eve release changes either one, pinned answers stop applying and the mock file answers instead. See [Give one eval its own mock answers](evals.md).
+
 ## MCP mocks are stateless
 
 eve's MCP client calls tools without an `mcp-session-id` header, as the hosted
