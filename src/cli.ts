@@ -343,7 +343,7 @@ function createBlockError({
       let mock = `${file}: export default defineHttpMock({ url: "${protocol}//${host}/" })`;
 
       if (connection !== undefined) {
-        mock = `eve-mocks add ${connection} && eve-mocks pull ${connection}`;
+        mock = `eve-mocks add ${connection}`;
       }
 
       return [
@@ -814,7 +814,7 @@ function createScaffold({ name, url, protocol }: { readonly name: string; readon
 
 export default defineMcpMock({
   url: "${url}",
-  // Pull its tools/list with: eve-mocks pull ${name}
+  // Refresh its tools/list with: eve-mocks pull ${name}
   // The mock lists the tools that have a result here.
   results: {},
 });
@@ -834,8 +834,16 @@ export default defineHttpMock({
 `;
 }
 
-/** Write `mocks/<name>.ts` for an eve connection, from its protocol and URL. */
-async function add({ dir, name }: { readonly dir: string; readonly name: string | undefined }): Promise<void> {
+/** Write `mocks/<name>.ts` for an eve connection, from its protocol and URL, then pull an MCP server's tools/list. */
+async function add({
+  dir,
+  name,
+  headers,
+}: {
+  readonly dir: string;
+  readonly name: string | undefined;
+  readonly headers: Readonly<Record<string, string>>;
+}): Promise<void> {
   if (name === undefined) {
     throw createError({
       status: 400,
@@ -882,8 +890,10 @@ async function add({ dir, name }: { readonly dir: string; readonly name: string 
   writeFileSync(path, createScaffold({ name, url: connection.url, protocol: connection.protocol }));
   console.log(formatDiff({ sign: "+", text: formatPath({ path }) }));
 
+  // An HTTP scaffold names no spec yet, so only an MCP server has something to pull.
   if (connection.protocol === "mcp") {
-    console.log(formatNext({ command: `eve-mocks pull ${name}` }));
+    console.log("");
+    await pull({ dir, name, headers });
   }
 }
 
@@ -1150,7 +1160,7 @@ try {
   } else if (name === "pull") {
     await pull({ dir, name: target, headers: parseHeaders({ flags: values.header }) });
   } else if (name === "add") {
-    await add({ dir, name: target });
+    await add({ dir, name: target, headers: parseHeaders({ flags: values.header }) });
   } else if (name === "init") {
     init({ dir });
   } else {
