@@ -32,7 +32,7 @@ const PAGES: readonly Page[] = [
     source: "README.md",
     slug: "index",
     title: "Getting started",
-    description: "Six steps from an agent that calls production to an eval that runs offline.",
+    description: "Four steps from an agent that calls production to an eval that runs offline.",
   },
   {
     source: "docs/mocks.md",
