@@ -6,30 +6,20 @@ Start with [Mocks](mocks.md). These are the cases the basics do not cover.
 
 ### Do I have to mock a connection's sign-in?
 
-No. A connection signs in before it calls its upstream, and eve-mocks answers
-that sign-in itself. The connection's own auth code runs unchanged and gets
-`mock-token`, which a mocked upstream accepts. No client secret is needed, not
-locally and not in CI.
+No. eve-mocks answers it, and the connection's own auth code receives
+`mock-token`. Why, and when to write `oauthToken`:
+[Authentication](authentication.md).
 
-```
-❅ eve-mocks  4 calls, no block
+### Which requests pass without a mock or an allow entry?
 
-  ✓ mock             4
-  ├─ linear          3
-  │  └─ get_issue    3
-  └─ sign-in         1   answered by default
-
-  report      .eve-mocks/report.json
-```
-
-| Sign-in | Recognised by |
+| Request | Why |
 | --- | --- |
-| [Vercel Connect](https://vercel.com/docs/connect) | its token endpoint, `api.vercel.com/v1/connect/token/` |
-| any OAuth 2.0 token endpoint | `grant_type` in the request body, which [every grant sends](https://datatracker.ietf.org/doc/html/rfc6749#section-4) |
+| loopback (`localhost`, `127.0.0.1`, `[::1]`) | eve's processes talk to each other over it |
+| `data:`, `blob:`, `file:` | no network involved |
+| `api.vercel.com`, `telemetry.vercel.com`, only under a wrapped `eve dev` | eve's own credential gate and telemetry, shown as `eve-dev` in the summary |
 
-A mock or an [allow](allow.md) entry for the same URL wins, so allowing a token
-endpoint still reaches the real one. Signing in to download a schema is a
-different topic: [pull from a protected upstream](mocks.md#protected-upstreams).
+These are checked last. A mock or an [allow](allow.md) entry for the same URL
+wins, and a connection's [sign-in](authentication.md) still gets `mock-token`.
 
 ### Why does eve dev reach api.vercel.com under --mocks?
 
@@ -41,18 +31,8 @@ gets `mock-token`.
 
 ### My token endpoint sends no `grant_type`. Why is it blocked?
 
-Only a request with `grant_type` is recognised as a sign-in. Any other token
-endpoint is blocked like every request. Mock it by its URL:
-
-```ts
-// mocks/auth.ts
-import { oauthToken } from "eve-mocks";
-
-export default oauthToken({ url: "https://auth.example.com/token" });
-```
-
-It answers `{ access_token: "mock-token", token_type: "Bearer" }`. For another
-shape, use [`defineHttpMock`](mocks.md#http) with a route.
+Only a request with `grant_type` is recognised as a sign-in. Name the endpoint
+with [`oauthToken`](authentication.md#oauth).
 
 ### Several connections share one host. How do I mock them?
 
@@ -82,6 +62,11 @@ defineHttpMock({ url: "https://billing.example.com", spec: "../openapi/billing.j
 ```
 
 eve accepts only modules inside `lib/`, so keep the `.json` file outside it.
+
+### A connection downloads its OpenAPI spec at run time. Do I mock that request?
+
+No. When the URL is the same one the mock's `spec` names, the connection gets
+the pulled copy in `mocks/schemas/`. That request needs no mock of its own.
 
 ### An upstream has no OpenAPI spec. Can I still mock it?
 

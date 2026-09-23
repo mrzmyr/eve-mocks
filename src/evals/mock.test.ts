@@ -329,7 +329,7 @@ describe("mock(t, …)", () => {
     const ambiguous = createContext();
 
     mock(ambiguous, "search", {});
-    await expect(ambiguous.session()).rejects.toThrow('mock(t, "notion-mcp:search" or "linear:search"');
+    await expect(ambiguous.session()).rejects.toThrow('mock(t, "linear:search" or "notion-mcp:search"');
 
     const named = createContext();
 

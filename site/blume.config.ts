@@ -13,4 +13,7 @@ export default defineConfig({
   navigation: { repo: "https://github.com/mrzmyr/eve-mocks" },
   lastModified: true,
   deployment: { site: "https://eve-mocks.vercel.app" },
+  // The "Was this page helpful?" buttons call Vercel `track("feedback")`.
+  // The script 404s until Web Analytics is enabled on the Vercel project.
+  analytics: { vercel: true },
 });

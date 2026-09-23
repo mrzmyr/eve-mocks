@@ -3,15 +3,22 @@
 One file per upstream in `mocks/`. Each default-exports a mock, and its file
 name is the mock's name in `list` and in the run summary.
 
+An answer lives in one of three places:
+
+- Every eval can share it: `results` or `routes` in that file.
+- One assertion depends on it: [`mock`](evals.md) inside the eval.
+- It has to be the real upstream: [`allow`](allow.md).
+
+An MCP mock lists the tools you gave a result. An HTTP mock answers every
+operation in the spec; pin a route for anything an assertion depends on.
+Generated samples are smoke-test data (`"string"`, arrays of one).
+
 ```sh
 bunx eve-mocks add linear     # writes mocks/linear.ts, pulls an MCP server's tools/list to mocks/schemas/
 bunx eve-mocks pull linear    # refreshes the schema, or pulls an HTTP mock's spec
 ```
 
 ## MCP
-
-Give every tool your evals use a result. The function receives the call's
-arguments and returns the JSON the tool answers with.
 
 ```ts
 // mocks/linear.ts
@@ -26,15 +33,12 @@ export default defineMcpMock({
 });
 ```
 
-- **The mock lists only the tools that have a result.** A read-only agent never
-  sees `create_issue` unless you add it.
-- **Names, descriptions, and input schemas come from the pulled schema**, so the
-  model reads the same text as in production.
+Each result receives the call's arguments and returns the JSON the tool answers
+with.
+
+The function: [`defineMcpMock`](api/define-mcp-mock.md).
 
 ## HTTP
-
-Point `spec` at the upstream's OpenAPI spec and pin the routes your evals
-assert on. The spec answers everything else.
 
 ```ts
 // mocks/notion.ts
@@ -52,18 +56,10 @@ export default defineHttpMock({
 });
 ```
 
-| A request that matches | Gets |
-| --- | --- |
-| a route | what the handler returns: a `Response`, or any JSON value sent as 200 |
-| only the spec | the operation's example, else a sample generated from its schema |
-| neither | 404, as the real API would |
+A pinned route wins. Otherwise the request gets the operation's example, or a
+sample generated from its schema, or 404.
 
-A connection that downloads the same `spec` URL at run time gets the pulled copy,
-so that request needs no mock of its own.
-
-Routes are path, then upper-case method. Paths use the spec's `{param}` syntax,
-so they copy straight from it. Generated samples are smoke-test data
-(`"string"`, arrays of one), so pin anything an eval asserts on.
+The function: [`defineHttpMock`](api/define-http-mock.md).
 
 ## Schemas
 
@@ -101,9 +97,6 @@ need a credential. It runs on your machine, never in CI.
 bunx eve-mocks pull events --header "Authorization: Bearer $TOKEN"
 ```
 
-`--header` is repeatable and needs the mock's name, so a credential goes to one
-upstream and never to all of them. It is not stored anywhere.
+`--header` is not stored. The flag's rules: [CLI](cli.md).
 
 Local spec files, several specs on one host, and more: [FAQ](faq.md).
-
-To give one eval a different answer than the mock file, pin it inside the eval: [Give one eval its own mock answers](evals.md).

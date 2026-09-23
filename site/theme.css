@@ -1,0 +1,5 @@
+/* API Reference function names. */
+a.blume-nav-link[href^="/api/"] {
+  font-family: var(--blume-font-mono);
+  font-size: 0.8125rem;
+}

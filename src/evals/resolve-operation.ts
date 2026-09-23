@@ -80,9 +80,13 @@ export async function resolveOperation({ operation }: { readonly operation: stri
     });
   }
 
-  const matches = declared.filter((candidate) => {
-    return candidate.key === key;
-  });
+  const matches = declared
+    .filter((candidate) => {
+      return candidate.key === key;
+    })
+    .sort((left, right) => {
+      return left.mock.localeCompare(right.mock);
+    });
 
   if (matches.length === 1) {
     return matches[0] as ResolvedOperation;

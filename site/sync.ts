@@ -5,7 +5,7 @@
  * Run from `site/`: the output lands in `site/content/`, which is gitignored.
  */
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 
 /** One page of the site, in sidebar order. */
 type Page = {
@@ -18,10 +18,20 @@ type Page = {
    * without adding a URL segment. See https://useblume.dev/docs/content/navigation
    */
   readonly group?: string;
+  /**
+   * URL folder and sidebar group. `api` writes `content/api/<slug>.mdx`,
+   * served at `/api/<slug>`.
+   */
+  readonly section?: string;
   /** Sidebar and metadata title. */
   readonly title: string;
   /** Meta description and search snippet. */
   readonly description: string;
+};
+
+/** Sidebar title of a URL folder. */
+const SECTIONS: Readonly<Record<string, { readonly title: string }>> = {
+  api: { title: "API Reference" },
 };
 
 const ROOT = join(import.meta.dirname, "..");
@@ -38,23 +48,30 @@ const PAGES: readonly Page[] = [
     source: "docs/mocks.md",
     slug: "mocks",
     title: "Mocks",
-    description: "Mock an MCP server or an HTTP API, and keep its schema next to it.",
+    description: "Where an answer lives, then an MCP server or an HTTP API and its schema.",
   },
   {
     source: "docs/evals.md",
     slug: "evals",
     title: "Evals",
-    description: "Give one eval its own mock answers with mock(t, …).",
+    description: "Mock files answer every eval. Pin a different answer when one assertion depends on it.",
   },
   {
     source: "docs/allow.md",
     slug: "allow",
     title: "Allow",
-    description: "Let a real upstream through, and what happens to every other call.",
+    description: "Allow the model gateway. Every other call is mocked or fails the run.",
+  },
+  {
+    source: "docs/authentication.md",
+    slug: "authentication",
+    title: "Authentication",
+    description: "Sign-in is answered with mock-token. Write oauthToken when the token endpoint sends no grant_type.",
   },
   {
     source: "docs/cli.md",
     slug: "cli",
+    group: "Reference",
     title: "CLI",
     description: "Every command, --json output, exit codes, and what coding agents can rely on.",
   },
@@ -63,7 +80,7 @@ const PAGES: readonly Page[] = [
     slug: "faq",
     group: "Reference",
     title: "FAQ",
-    description: "Sign-ins, and the cases the basics do not cover.",
+    description: "Requests that pass on their own, and the cases the basics do not cover.",
   },
   {
     source: "docs/ci.md",
@@ -79,6 +96,41 @@ const PAGES: readonly Page[] = [
     title: "Constraints",
     description: "What eve-mocks does not mock, and why.",
   },
+  {
+    source: "docs/api/define-mcp-mock.md",
+    slug: "define-mcp-mock",
+    section: "api",
+    title: "defineMcpMock",
+    description: "Mock an MCP server from its pulled tool list and a result per tool.",
+  },
+  {
+    source: "docs/api/define-http-mock.md",
+    slug: "define-http-mock",
+    section: "api",
+    title: "defineHttpMock",
+    description: "Mock an HTTP API from pinned routes, an OpenAPI spec, or both.",
+  },
+  {
+    source: "docs/api/mock.md",
+    slug: "mock",
+    section: "api",
+    title: "mock",
+    description: "Pin what one operation answers for the sessions one eval starts.",
+  },
+  {
+    source: "docs/api/allow.md",
+    slug: "allow",
+    section: "api",
+    title: "allow",
+    description: "Let requests to one real upstream through while the mocks are on.",
+  },
+  {
+    source: "docs/api/oauth-token.md",
+    slug: "oauth-token",
+    section: "api",
+    title: "oauthToken",
+    description: "Mock an OAuth 2.0 token endpoint so client-credentials code receives mock-token.",
+  },
 ];
 
 /** Folder of a group: `Guides` becomes `(guides)`. */
@@ -86,26 +138,48 @@ function getFolder({ group }: { readonly group: string }): string {
   return `(${group.toLowerCase()})`;
 }
 
+/** Site route of a page. The landing page is `/`. */
+function getRoute({ page }: { readonly page: Page }): string {
+  if (page.slug === "index") {
+    return "/";
+  }
+
+  if (page.section !== undefined) {
+    return `/${page.section}/${page.slug}`;
+  }
+
+  return `/${page.slug}`;
+}
+
 /**
- * Rewrite the repository's relative `.md` links to site routes. Source file
- * names are unique, so a link resolves by its file name wherever it points
- * from: `docs/guides/ci.md`, `../faq.md`, and `faq.md#x` all work.
+ * Resolve a relative `.md` link against the file that contains it.
+ * `docs/api/allow.md` and `docs/allow.md` are different pages, so the link's
+ * directory matters: `allow.md`, `../allow.md`, and `api/allow.md` each land
+ * on the page they name.
  */
-function toRoutes({ markdown }: { readonly markdown: string }): string {
+function resolveHref({ from, href }: { readonly from: string; readonly href: string }): string {
+  const slash = from.lastIndexOf("/");
+  const dir = slash === -1 ? "" : from.slice(0, slash);
+
+  if (dir === "") {
+    return posix.normalize(href);
+  }
+
+  return posix.normalize(posix.join(dir, href));
+}
+
+/**
+ * Rewrite the repository's relative `.md` links to site routes.
+ */
+function toRoutes({ markdown, source }: { readonly markdown: string; readonly source: string }): string {
   const routes = new Map(
-    PAGES.map(({ source, slug }) => {
-      let route = `/${slug}`;
-
-      if (slug === "index") {
-        route = "/";
-      }
-
-      return [source.split("/").at(-1), route];
+    PAGES.map((page) => {
+      return [page.source, getRoute({ page })];
     }),
   );
 
-  const out = markdown.replaceAll(/\]\((?:[\w./-]*\/)?([\w-]+\.md)(#[^)]*)?\)/g, (match, name: string, anchor = "") => {
-    const route = routes.get(name);
+  const out = markdown.replaceAll(/\]\(([^)\s#]+\.md)(#[^)]*)?\)/g, (match, href: string, anchor = "") => {
+    const route = routes.get(resolveHref({ from: source, href }));
 
     if (route === undefined) {
       return match;
@@ -312,28 +386,71 @@ for (const page of PAGES) {
 
   if (page.group !== undefined) {
     dir = join(OUT, getFolder({ group: page.group }));
-    mkdirSync(dir, { recursive: true });
+  } else if (page.section !== undefined) {
+    dir = join(OUT, page.section);
   }
 
+  mkdirSync(dir, { recursive: true });
+
   const markdown = readFileSync(join(ROOT, page.source), "utf8");
-  const body = toAnsi({ markdown: toComponents({ markdown: toRoutes({ markdown: dropTitle({ markdown }) }) }) });
+  const body = toAnsi({
+    markdown: toComponents({ markdown: toRoutes({ markdown: dropTitle({ markdown }), source: page.source }) }),
+  });
   const frontMatter = `---\ntitle: ${JSON.stringify(page.title)}\ndescription: ${JSON.stringify(page.description)}\n---\n\n`;
 
   writeFileSync(join(dir, `${page.slug}.mdx`), `${frontMatter}${body}`);
   console.log(`${page.slug}.mdx from ${page.source}`);
 }
 
+/** First sidebar entry of a loose page: its URL folder, or its own slug. */
+function getRootPage({ page }: { readonly page: Page }): string {
+  if (page.section !== undefined) {
+    return page.section;
+  }
+
+  return page.slug;
+}
+
 // Sidebar order: loose pages first, as written above, then each group.
+// A section folder is one entry; its children are ordered in its own meta.
 writeMeta({
   dir: OUT,
   meta: {
     pages: PAGES.filter(({ group }) => {
       return group === undefined;
-    }).map(({ slug }) => {
-      return slug;
-    }),
+    }).reduce<string[]>((pages, page) => {
+      const entry = getRootPage({ page });
+
+      if (pages.includes(entry)) {
+        return pages;
+      }
+
+      return [...pages, entry];
+    }, []),
   },
 });
+
+const sections = [...new Set(PAGES.flatMap(({ section }) => section ?? []))];
+
+for (const section of sections) {
+  const title = SECTIONS[section]?.title;
+
+  if (title === undefined) {
+    throw new Error(`No sidebar title for section ${section}`);
+  }
+
+  writeMeta({
+    dir: join(OUT, section),
+    meta: {
+      title,
+      pages: PAGES.filter((page) => {
+        return page.section === section;
+      }).map(({ slug }) => {
+        return slug;
+      }),
+    },
+  });
+}
 
 for (const [order, group] of groups.entries()) {
   writeMeta({

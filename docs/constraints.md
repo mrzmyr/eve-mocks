@@ -28,7 +28,7 @@ eve gives an eval no ID, so `mock(t, …)` relies on two parts of eve that eve d
 - **`t.send` and `t.session`**: eve-mocks wraps both on the eval's `t` to record which sessions the eval starts
 - **eve's context store**: eve-mocks reads the session ID of each call from `Symbol.for("eve.context-storage")`
 
-If a future eve release changes either one, pinned answers stop applying and the mock file answers instead. See [Give one eval its own mock answers](evals.md).
+If a future eve release changes either one, pinned answers stop applying and the mock file answers instead. See [Evals](evals.md).
 
 ## MCP mocks are stateless
 
