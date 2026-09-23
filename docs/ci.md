@@ -36,7 +36,7 @@ Opt out with `--no-fail-on-block`, in the wrapped command or before `--`.
 
 Only those of the upstreams you [allow](allow.md), usually just the model
 gateway. Connection credentials are not needed: every
-[sign-in](faq.md#do-i-have-to-mock-a-connections-sign-in) is answered locally, and each connection's real
+[sign-in](authentication.md) is answered locally, and each connection's real
 token code runs against that.
 
 ### Where do I see what the agent called?
