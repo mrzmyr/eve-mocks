@@ -14,15 +14,19 @@ const OFFLINE_OIDC_TOKEN = [
 ].join(".");
 
 /**
- * Mock Vercel Connect's token endpoint, so each connection's real `getToken`
- * runs and receives `mock-token` while no credential leaves the machine.
+ * Vercel Connect's token prefix. Connector ids follow it and contain slashes.
+ * See https://vercel.com/docs/connect
+ */
+export const CONNECT_URL = "https://api.vercel.com/v1/connect/token/";
+
+/**
+ * The built-in answer for {@link CONNECT_URL}. The sign-in default uses it;
+ * a mock file is not required.
  * See https://vercel.com/docs/connect
  */
 export function vercelConnect(): Mock {
   return {
-    // A prefix, not a route: connector ids such as `mcp.linear.app/linear`
-    // follow it and contain slashes.
-    url: "https://api.vercel.com/v1/connect/token/",
+    url: CONNECT_URL,
     type: "http",
     env: { VERCEL_OIDC_TOKEN: OFFLINE_OIDC_TOKEN },
     handle: async () => {

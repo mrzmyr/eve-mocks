@@ -253,6 +253,32 @@ describe("cli", () => {
     expect(allowed).toEqual(["a.example.com", "b.example.com", "model-gateway"]);
   });
 
+  test("mocks Vercel Connect when an allow covers only the host", () => {
+    const root = mkdtempSync(join(tmpdir(), "eve-mocks-connect-"));
+
+    mkdirSync(join(root, "mocks"));
+    writeFileSync(
+      join(root, "mocks/vercel-host.ts"),
+      `import { allow } from ${JSON.stringify(join(import.meta.dir, "index.ts"))};
+       export default allow({ url: "https://api.vercel.com/" });`,
+    );
+    writeFileSync(
+      join(root, "wide.mjs"),
+      `const connect = await fetch("https://api.vercel.com/v1/connect/token/linear", { method: "POST" });
+       console.log((await connect.json()).token);
+       await fetch("https://api.vercel.com/v2/user").then(
+         () => { console.log("api PASSED"); },
+         (error) => { console.log(error.message.startsWith("eve-mocks block") ? "api BLOCKED" : "api PASSED"); },
+       );`,
+    );
+
+    const { stdout, stderr, status } = run({ args: ["--", "node", "wide.mjs", "--mocks"], cwd: root });
+
+    expect(stdout.trim().split("\n")).toEqual(["mock-token", "api PASSED"]);
+    expect(stderr).toContain("answered by default");
+    expect(status).toBe(0);
+  });
+
   test("answers a sign-in by default, and still blocks another POST to the same host", () => {
     const { stdout, stderr, status } = run({ args: ["--", "node", "sign-in.mjs", "--mocks"], cwd: APP_ROOT });
 

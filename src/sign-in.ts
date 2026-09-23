@@ -1,6 +1,6 @@
 import { oauthToken } from "./oauth-token.ts";
 import type { Mock } from "./types.ts";
-import { vercelConnect } from "./vercel-connect.ts";
+import { CONNECT_URL, vercelConnect } from "./vercel-connect.ts";
 
 /** Name of the default sign-in mock in the call log and the run summary. */
 export const SIGN_IN = "sign-in";
@@ -41,6 +41,31 @@ async function isTokenRequest({ request }: { readonly request: Request }): Promi
   }
 
   return new URLSearchParams(body).has("grant_type");
+}
+
+/**
+ * Whether an allow entry claims `requestUrl`.
+ *
+ * A request under {@link CONNECT_URL} is claimed only by an allow of that
+ * prefix or a narrower one. A wider allow, such as `https://api.vercel.com/`,
+ * leaves the sign-in default to answer the token path.
+ */
+export function isAllowMatch({
+  allowUrl,
+  requestUrl,
+}: {
+  readonly allowUrl: string;
+  readonly requestUrl: string;
+}): boolean {
+  if (!requestUrl.startsWith(allowUrl)) {
+    return false;
+  }
+
+  if (!requestUrl.startsWith(CONNECT_URL)) {
+    return true;
+  }
+
+  return allowUrl.startsWith(CONNECT_URL);
 }
 
 /**
