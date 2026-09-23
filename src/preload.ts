@@ -16,7 +16,7 @@ import { createError } from "./errors.ts";
 import { EVE_DEV, isEveDevUrl } from "./eve-dev.ts";
 import { guardNodeHttp } from "./guard-node-http.ts";
 import { loadMocks, type LoadedMocks } from "./load-mocks.ts";
-import { getSignIn, SIGN_IN, SIGN_IN_ENV } from "./sign-in.ts";
+import { getSignIn, isAllowMatch, SIGN_IN, SIGN_IN_ENV } from "./sign-in.ts";
 import type { CallRecord } from "./types.ts";
 
 const { EVE_MOCKS_DIR, EVE_MOCKS_LOG, EVE_MOCKS_EVE_DEV } = process.env;
@@ -174,7 +174,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   }
 
   const pass = allowed.find(({ entry }) => {
-    return url.startsWith(entry.url);
+    return isAllowMatch({ allowUrl: entry.url, requestUrl: url });
   });
 
   if (pass) {
@@ -194,8 +194,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     }
   }
 
-  // Last, so it only ever replaces a blocked call: a mock or an allow entry
-  // for the token endpoint has already won above.
+  // Last, so it only replaces a call nothing else claimed. A mock file has
+  // already won, and so has an allow of the token prefix itself. A wider
+  // allow of the host has not: Vercel Connect's token path stays mocked.
   const request = new Request(input, init);
   const signIn = await getSignIn({ request });
 
