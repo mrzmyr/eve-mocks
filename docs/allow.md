@@ -1,9 +1,13 @@
 # Allow
 
-Under `--mocks` a call has one outcome: mock, allow, or block. `allow()` lets
-one upstream through to the real thing. The call reaches production, CI needs
-that upstream's secret, and the response is whatever production returns. Allow
-the model gateway. Mock any upstream whose body an assertion depends on.
+Under `--mocks` each call has one outcome: mock, allow, or block. `allow()`
+sends the calls to one upstream to the real service:
+
+- The call goes to production.
+- CI needs the secret of that upstream.
+- The response comes from production.
+
+Allow the model gateway. Mock each upstream whose response an assertion uses.
 
 ```ts
 // mocks/ai-gateway.ts
@@ -24,11 +28,15 @@ The function: [`allow`](api/allow.md).
 
 ## Block
 
-Everything else throws inside the agent. The run summary collects the blocks,
-names the eve connection a host belongs to, and one block fails the run with
-exit 1, even when every eval passed. A model that recovers from the thrown
-error would otherwise hide that the agent reached for an upstream nobody
-decided on.
+Each other call throws an error inside the agent.
+
+- The run summary lists each blocked call.
+- The run summary names the eve connection of each blocked host.
+- One block fails the run with exit 1, also when all evals pass.
+
+The exit code is necessary. A model can recover from the thrown error. Without
+the exit code, nobody sees that the agent called an upstream that nobody
+approved.
 
 ```
 ❅ eve-mocks  31 calls, 1 block

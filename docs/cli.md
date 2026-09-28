@@ -41,16 +41,17 @@ read this site.
 eve-mocks -- eve eval --mocks
 ```
 
-Flags after `--` belong to the wrapped command; eve-mocks never reads them.
-`--mocks` is what turns the mocks on.
+- Flags after `--` go to the wrapped command. eve-mocks does not read them.
+- `--mocks` turns on the mocks.
+- Each run with `--mocks` writes `.eve-mocks/report.json`. This file always
+  holds the latest run.
+- Each run also writes a timestamped copy to `.eve-mocks/runs/`. The folder
+  keeps the last 10 runs.
+- The `.eve-mocks/` folder ignores itself in git.
+- One block fails the run with exit 1, also when the wrapped command exits 0.
 
-Every run under `--mocks` writes `.eve-mocks/report.json` (always the latest)
-and a timestamped copy in `.eve-mocks/runs/` (the last 10). The folder ignores
-itself in git. Shape and call log:
-[CI](ci.md#where-do-i-see-what-the-agent-called).
-
-One block fails the run with exit 1 even when the wrapped command exited 0.
-The summary: [Allow](allow.md).
+Report shape and call log: [CI](ci.md#where-do-i-see-what-the-agent-called).
+Run summary: [Allow](allow.md).
 
 ## Machine-readable output
 
