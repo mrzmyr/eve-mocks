@@ -55,6 +55,8 @@ type Scope = {
    * failed lookup fails that `t.send` or `t.session`.
    */
   readonly pending: Promise<void>[];
+  /** Initial state per mock, from `seed(t, …)`. */
+  readonly seeds: Map<string, unknown>;
 };
 
 const scopes = new WeakMap<EvalContext, Scope>();
@@ -68,7 +70,7 @@ export function getScope({ t }: { readonly t: EvalContext }): Scope {
     return existing;
   }
 
-  const scope: Scope = { sessions: new Set(), handlers: [], pending: [] };
+  const scope: Scope = { sessions: new Set(), handlers: [], pending: [], seeds: new Map() };
 
   scopes.set(t, scope);
 
@@ -123,6 +125,33 @@ export function addHandler({
   // never starts a session from reporting an unhandled rejection.
   ready.catch(() => {});
   scope.pending.push(ready);
+}
+
+/** The scope of the eval that created `sessionId`; none for a session no eval created. */
+export function findScope({ sessionId }: { readonly sessionId: string }): Scope | undefined {
+  return bySession.get(sessionId);
+}
+
+/** State per session, then mock, as the dev server sent it after the latest call. */
+const states = new Map<string, Map<string, unknown>>();
+
+/** Keep the state a session left on a mock. */
+export function setState({ sessionId, mock, state }: { readonly sessionId: string; readonly mock: string; readonly state: unknown }): void {
+  let byMock = states.get(sessionId);
+
+  if (byMock === undefined) {
+    byMock = new Map();
+    states.set(sessionId, byMock);
+  }
+
+  byMock.set(mock, state);
+}
+
+/** The state a session left on a mock; `has` is false before its first call to it. */
+export function findState({ sessionId, mock }: { readonly sessionId: string; readonly mock: string }): { readonly has: boolean; readonly state: unknown } {
+  const byMock = states.get(sessionId);
+
+  return { has: byMock?.has(mock) === true, state: byMock?.get(mock) };
 }
 
 /** Handlers of the eval that owns `sessionId`, for one mock and key; none for a session no eval created. */

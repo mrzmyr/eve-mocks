@@ -27,6 +27,51 @@ function loadAll(): Promise<readonly NamedMock[]> {
   return loaded;
 }
 
+/** The error for a mock name no file of the mocks directory has. */
+function createUnknownMock({
+  name,
+  mocks,
+  why,
+}: {
+  readonly name: string;
+  readonly mocks: readonly NamedMock[];
+  readonly why: string;
+}): Error {
+  const closest = getClosest({ value: name, candidates: mocks.map((entry) => entry.name) });
+
+  return createError({
+    status: 404,
+    message: `No mock named ${name}`,
+    why,
+    fix: `Did you mean ${closest}? The name is a file in the mocks directory`,
+  });
+}
+
+/**
+ * The mock file `name`, which must declare a `state`.
+ *
+ * @throws MockError when no such mock exists, or it keeps no state.
+ */
+export async function resolveStateful({ name, call }: { readonly name: string; readonly call: string }): Promise<NamedMock["mock"]> {
+  const mocks = await loadAll();
+  const found = mocks.find((entry) => entry.name === name);
+
+  if (found === undefined) {
+    throw createUnknownMock({ name, mocks, why: `${call}(t, "${name}") names a mock file, and mocks/${name}.ts does not exist` });
+  }
+
+  if (found.mock.createState === undefined) {
+    throw createError({
+      status: 400,
+      message: `Mock ${name} keeps no state`,
+      why: `${call}(t, "${name}") reads or replaces the mock's state, and mocks/${name}.ts declares none`,
+      fix: `Add state: () => ({ … }) to the mock in mocks/${name}.ts`,
+    });
+  }
+
+  return found.mock;
+}
+
 /** `post /v1/search` as `POST /v1/search`; a tool name unchanged. */
 function normalize({ operation }: { readonly operation: string }): string {
   const space = operation.indexOf(" ");
@@ -70,14 +115,7 @@ export async function resolveOperation({ operation }: { readonly operation: stri
   });
 
   if (name !== undefined && !mocks.some((entry) => entry.name === name)) {
-    const closest = getClosest({ value: name, candidates: mocks.map((entry) => entry.name) });
-
-    throw createError({
-      status: 404,
-      message: `No mock named ${name}`,
-      why: `mock(t, "${operation}") names a mock file, and mocks/${name}.ts does not exist`,
-      fix: `Did you mean ${closest}? The name before ":" is a file in the mocks directory`,
-    });
+    throw createUnknownMock({ name, mocks, why: `mock(t, "${operation}") names a mock file, and mocks/${name}.ts does not exist` });
   }
 
   const matches = declared

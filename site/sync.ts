@@ -118,6 +118,20 @@ const PAGES: readonly Page[] = [
     description: "Pin what one operation answers for the sessions one eval starts.",
   },
   {
+    source: "docs/api/seed.md",
+    slug: "seed",
+    section: "api",
+    title: "seed",
+    description: "Set where one eval's sessions start on a stateful mock.",
+  },
+  {
+    source: "docs/api/get-state.md",
+    slug: "get-state",
+    section: "api",
+    title: "getState",
+    description: "Read the state a session left on a stateful mock.",
+  },
+  {
     source: "docs/api/allow.md",
     slug: "allow",
     section: "api",

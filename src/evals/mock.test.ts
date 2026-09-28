@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 import { loadMocks, type NamedMock } from "../load-mocks.ts";
 import { mock } from "./mock.ts";
+import { getState, seed } from "./state.ts";
 import { PORT_ENV } from "./protocol.ts";
 import type { EvalContext, EvalSession } from "./scope.ts";
 
@@ -56,8 +57,9 @@ function createContext(): EvalContext & { readonly sent: string[] } {
     },
     send: async (message) => {
       sent.push(`direct ${String(message)}`);
+      sessions += 1;
 
-      return {};
+      return { sessionId: `session_${sessions}` };
     },
   };
 
@@ -88,8 +90,16 @@ function getMock({ name }: { readonly name: string }): NamedMock {
 }
 
 /** A `tools/call` request as eve's MCP client sends it. */
-function createToolCall({ name, args }: { readonly name: string; readonly args: Record<string, unknown> }): Request {
-  return new Request("https://mcp.linear.app/mcp", {
+function createToolCall({
+  name,
+  args,
+  url = "https://mcp.linear.app/mcp",
+}: {
+  readonly name: string;
+  readonly args: Record<string, unknown>;
+  readonly url?: string;
+}): Request {
+  return new Request(url, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
@@ -160,6 +170,37 @@ beforeAll(async () => {
   writeFileSync(
     join(root, "mocks/schemas/notion-mcp.json"),
     JSON.stringify({ tools: [{ name: "search", inputSchema: { type: "object" } }] }),
+  );
+
+  writeFileSync(
+    join(root, "mocks/tracker.ts"),
+    `import { defineMcpMock } from ${index};
+     export default defineMcpMock({
+       url: "https://mcp.tracker.test/mcp",
+       state: () => ({ items: ["from the mock file"] }),
+       results: {
+         add_item: (args, { state }) => { state.items.push(String(args.name)); return { added: args.name }; },
+         list_items: (_args, { state }) => ({ items: state.items }),
+       },
+     });`,
+  );
+  writeFileSync(
+    join(root, "mocks/schemas/tracker.json"),
+    JSON.stringify({
+      tools: [
+        { name: "add_item", inputSchema: { type: "object" } },
+        { name: "list_items", inputSchema: { type: "object" } },
+      ],
+    }),
+  );
+  writeFileSync(
+    join(root, "mocks/counter.ts"),
+    `import { defineHttpMock } from ${index};
+     export default defineHttpMock({
+       url: "https://api.counter.test/",
+       state: () => ({ count: 0 }),
+       routes: { "/count": { POST: ({ state }) => { state.count += 1; return state; }, GET: ({ state }) => state } },
+     });`,
   );
 
   process.env.EVE_MOCKS_DIR = join(root, "mocks");
@@ -369,5 +410,91 @@ describe("mock(t, …)", () => {
     });
 
     expect(await readToolText({ response: answered })).toEqual({ title: "not awaited" });
+  });
+});
+
+/** Call a tool of the `tracker` mock in `sessionId`. */
+async function callTracker({
+  sessionId,
+  name,
+  args = {},
+}: {
+  readonly sessionId: string | undefined;
+  readonly name: string;
+  readonly args?: Record<string, unknown>;
+}): Promise<unknown> {
+  const { mock: tracker } = getMock({ name: "tracker" });
+  const response = await inSession({
+    sessionId,
+    work: () => tracker.handle(createToolCall({ name, args, url: "https://mcp.tracker.test/mcp" }), { name: "tracker" }),
+  });
+
+  return readToolText({ response });
+}
+
+describe("state", () => {
+  test("a write shows in the next read of the same session, and no other session sees it", async () => {
+    await callTracker({ sessionId: "session_a", name: "add_item", args: { name: "one" } });
+
+    expect(await callTracker({ sessionId: "session_a", name: "list_items" })).toEqual({ items: ["from the mock file", "one"] });
+    expect(await callTracker({ sessionId: "session_b", name: "list_items" })).toEqual({ items: ["from the mock file"] });
+  });
+
+  test("seed replaces the initial state for each session of the eval, and getState reads what a session left", async () => {
+    const t = createContext();
+    const other = createContext();
+
+    seed(t, "tracker", { items: ["seeded"] });
+
+    const first = await t.session();
+    const second = await t.session();
+    const unrelated = await other.session();
+
+    await callTracker({ sessionId: first.sessionId, name: "add_item", args: { name: "two" } });
+
+    expect(await callTracker({ sessionId: second.sessionId, name: "list_items" })).toEqual({ items: ["seeded"] });
+    expect(await callTracker({ sessionId: unrelated.sessionId, name: "list_items" })).toEqual({ items: ["from the mock file"] });
+    expect(await getState(first, "tracker")).toEqual({ items: ["seeded", "two"] });
+    expect(await getState(second, "tracker")).toEqual({ items: ["seeded"] });
+    expect(await getState(unrelated, "tracker")).toEqual({ items: ["from the mock file"] });
+  });
+
+  test("getState before any call is the seed, else the mock file's state", async () => {
+    const seeded = createContext();
+
+    seed(seeded, "tracker", { items: [] });
+
+    expect(await getState(await seeded.session(), "tracker")).toEqual({ items: [] });
+    expect(await getState(await createContext().session(), "counter")).toEqual({ count: 0 });
+  });
+
+  test("an HTTP route reads and changes the state, and a turn of an eval without seed or mock reads it", async () => {
+    const t = createContext();
+    const turn = (await t.send("count")) as { sessionId: string };
+    const { mock: counter } = getMock({ name: "counter" });
+    const post = () => {
+      return inSession({
+        sessionId: turn.sessionId,
+        work: () => counter.handle(new Request("https://api.counter.test/count", { method: "POST" }), { name: "counter" }),
+      });
+    };
+
+    await post();
+    await post();
+
+    expect(await getState(turn, "counter")).toEqual({ count: 2 });
+  });
+
+  test("a mock without state, or an unknown mock, fails seed and getState", async () => {
+    const stateless = createContext();
+
+    seed(stateless, "linear", {});
+    await expect(stateless.session()).rejects.toThrow("Mock linear keeps no state");
+
+    const typo = createContext();
+
+    seed(typo, "trackr", {});
+    await expect(typo.send("hi")).rejects.toThrow("Did you mean tracker?");
+    await expect(getState({ sessionId: "session_any" }, "trackr")).rejects.toThrow("No mock named trackr");
   });
 });

@@ -11,8 +11,21 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import { createError } from "../errors.ts";
-import { CALL_ROUTE, fromCall, OPERATIONS_ROUTE, PORT_ENV, toReply, type CallInput, type OperationsInput } from "./protocol.ts";
-import { findHandlers, findOperations, toInput } from "./scope.ts";
+import {
+  CALL_ROUTE,
+  fromCall,
+  OPERATIONS_ROUTE,
+  PORT_ENV,
+  SAVE_ROUTE,
+  STATE_ROUTE,
+  toReply,
+  type CallInput,
+  type OperationsInput,
+  type SaveInput,
+  type StateInput,
+  type StateReply,
+} from "./protocol.ts";
+import { findHandlers, findOperations, findScope, setState, toInput } from "./scope.ts";
 
 let server: Server | undefined;
 let listening: Promise<void> | undefined;
@@ -94,6 +107,29 @@ async function handle({ request, response }: { readonly request: IncomingMessage
     const { mock, sessionId } = body as OperationsInput;
 
     send({ response, status: 200, body: { operations: findOperations({ mock, sessionId }) } });
+    return;
+  }
+
+  if (request.url === STATE_ROUTE) {
+    const { mock, sessionId } = body as StateInput;
+    const seeds = findScope({ sessionId })?.seeds;
+
+    if (seeds === undefined || !seeds.has(mock)) {
+      send({ response, status: 204 });
+      return;
+    }
+
+    const reply: StateReply = { seed: seeds.get(mock) };
+
+    send({ response, status: 200, body: reply });
+    return;
+  }
+
+  if (request.url === SAVE_ROUTE) {
+    const { mock, sessionId, state } = body as SaveInput;
+
+    setState({ sessionId, mock, state });
+    send({ response, status: 204 });
     return;
   }
 

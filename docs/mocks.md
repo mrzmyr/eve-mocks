@@ -61,6 +61,37 @@ sample generated from its schema, or 404.
 
 The function: [`defineHttpMock`](api/define-http-mock.md).
 
+## State
+
+Add `state` when a write must show in a later read: the agent creates an issue,
+then lists issues and finds it.
+
+```ts
+// mocks/linear.ts
+import { defineMcpMock } from "eve-mocks";
+
+export default defineMcpMock({
+  url: "https://mcp.linear.app/mcp",
+  state: () => ({ issues: [{ id: "ENG-1", title: "Checkout fails on retry" }] }),
+  results: {
+    list_issues: (_args, { state }) => ({ issues: state.issues }),
+    create_issue: (args, { state }) => {
+      const issue = { id: `ENG-${state.issues.length + 1}`, title: String(args.title) };
+      state.issues.push(issue);
+      return issue;
+    },
+  },
+});
+```
+
+- **One state per eve session.** Each session starts from `state()`, so evals
+  running at once never see each other's writes.
+- **Handlers change it in place.** Every result or route of the mock gets the
+  same object for the session. `defineHttpMock` passes it as `state` next to
+  `request` and `params`.
+- **Keep it JSON.** An eval reads it with [`getState`](api/get-state.md) and
+  replaces it with [`seed`](api/seed.md), and both cross processes as JSON.
+
 ## Schemas
 
 `pull` saves what the real upstream says about itself. You never spell the

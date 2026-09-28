@@ -10,7 +10,20 @@
  */
 
 import { createError } from "./errors.ts";
-import { CALL_ROUTE, fromReply, OPERATIONS_ROUTE, PORT_ENV, type CallInput, type EvalCall, type EvalReply } from "./evals/protocol.ts";
+import {
+  CALL_ROUTE,
+  fromReply,
+  OPERATIONS_ROUTE,
+  PORT_ENV,
+  SAVE_ROUTE,
+  STATE_ROUTE,
+  type CallInput,
+  type EvalCall,
+  type EvalReply,
+  type SaveInput,
+  type StateInput,
+  type StateReply,
+} from "./evals/protocol.ts";
 
 /** Symbol eve stores its context `AsyncLocalStorage` under. */
 const STORAGE = Symbol.for("eve.context-storage");
@@ -19,7 +32,7 @@ const STORAGE = Symbol.for("eve.context-storage");
 const SESSION_ID_KEY = { name: "eve.sessionId" };
 
 /** Session id of the current eve step, or none outside one. */
-function getSessionId(): string | undefined {
+export function getSessionId(): string | undefined {
   const storage = (globalThis as Record<symbol, unknown>)[STORAGE] as
     | { readonly getStore?: () => { readonly get?: (key: { readonly name: string }) => unknown } | undefined }
     | undefined;
@@ -107,4 +120,45 @@ export async function listEvalOperations({ mock }: { readonly mock: string }): P
   const { operations } = (await response.json()) as { readonly operations: readonly string[] };
 
   return operations;
+}
+
+/** What the eval that owns the current session seeded on `mock`; none when it seeded nothing, or outside an eval. */
+export async function askSeed({ mock }: { readonly mock: string }): Promise<StateReply | undefined> {
+  const base = getBase();
+  const sessionId = getSessionId();
+
+  if (base === undefined || sessionId === undefined) {
+    return undefined;
+  }
+
+  const input: StateInput = { mock, sessionId };
+  const response = await fetch(`${base}${STATE_ROUTE}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (response.status === 204) {
+    return undefined;
+  }
+
+  return (await response.json()) as StateReply;
+}
+
+/** Hand the current session's state of `mock` to the runner, for `getState(turn, …)`. */
+export async function sendState({ mock, state }: { readonly mock: string; readonly state: unknown }): Promise<void> {
+  const base = getBase();
+  const sessionId = getSessionId();
+
+  if (base === undefined || sessionId === undefined) {
+    return;
+  }
+
+  const input: SaveInput = { mock, sessionId, state };
+
+  await fetch(`${base}${SAVE_ROUTE}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }

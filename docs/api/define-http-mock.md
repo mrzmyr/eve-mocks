@@ -24,7 +24,8 @@ export default defineHttpMock({
 | --- | --- |
 | `url` | Production URL prefix the paths hang off. |
 | `spec` | The upstream's OpenAPI JSON: a URL, a path relative to `mocks/`, or an array of them. Optional. |
-| `routes` | Pinned answers, path then upper-case method. Optional. |
+| `state` | Initial state per eve session. Optional. See [State](../mocks.md#state). |
+| `routes` | Pinned answers, path then upper-case method. A handler receives `request`, `params`, and `state`. Optional. |
 
 A handler returns a `Response`, or any JSON value sent as 200. Paths use the spec's `{param}` syntax, so they copy straight from it. With a `spec`, every route must name an operation it declares.
 

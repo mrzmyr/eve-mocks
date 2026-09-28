@@ -65,7 +65,43 @@ mock(t, "POST /v1/search", async ({ request }) => {
 });
 ```
 
+## State
+
+For a [stateful mock](mocks.md#state), `seed` sets where this eval's sessions
+start and `getState` reads what a session left. Assert on the outcome, not only
+on the calls.
+
+```ts
+import assert from "node:assert/strict";
+import { defineEval } from "eve/evals";
+import { getState, seed } from "eve-mocks/evals";
+
+type Linear = { issues: { id: string; state: "open" | "closed" }[] };
+
+export default defineEval({
+  async test(t) {
+    seed(t, "linear", {
+      issues: [
+        { id: "ENG-1", state: "open" },
+        { id: "ENG-2", state: "open" },
+      ],
+    });
+
+    const turn = await t.send("ENG-2 duplicates ENG-1. Close the duplicate.");
+    const { issues } = await getState<Linear>(turn, "linear");
+
+    assert.deepEqual(issues.map((issue) => issue.state), ["open", "closed"]);
+  },
+});
+```
+
+Each session this eval creates starts from its own copy of the seed. A pinned
+`mock(t, …)` answer wins over the mock file's result and leaves the state as it
+is.
+
+## Several mocks, one name
+
 When several connections share a tool or route name, prefix it with the mock's
 name: `linear:search`.
 
-The call: [`mock`](api/mock.md).
+The calls: [`mock`](api/mock.md), [`seed`](api/seed.md), [`getState`](api/get-state.md).

@@ -13,6 +13,12 @@ export const CALL_ROUTE = "/call";
 /** Route the dev server asks for the operations an eval mocked for a session. */
 export const OPERATIONS_ROUTE = "/operations";
 
+/** Route the dev server asks what the eval that owns a session seeded. */
+export const STATE_ROUTE = "/state";
+
+/** Route the dev server posts a session's state of a mock to after each call that read it. */
+export const SAVE_ROUTE = "/state/save";
+
 /** One intercepted call, as the dev server sends it. */
 export type EvalCall =
   | {
@@ -48,6 +54,25 @@ export type CallInput = {
 export type OperationsInput = {
   readonly mock: string;
   readonly sessionId: string;
+};
+
+/** What the dev server posts to {@link STATE_ROUTE}. */
+export type StateInput = {
+  readonly mock: string;
+  readonly sessionId: string;
+};
+
+/** The runner's answer on {@link STATE_ROUTE} when the eval seeded the mock; 204 otherwise. */
+export type StateReply = {
+  /** What `seed(t, …)` set for the mock. */
+  readonly seed: unknown;
+};
+
+/** What the dev server posts to {@link SAVE_ROUTE}. */
+export type SaveInput = {
+  readonly mock: string;
+  readonly sessionId: string;
+  readonly state: unknown;
 };
 
 /** A handler's return value, as the runner sends it back. */

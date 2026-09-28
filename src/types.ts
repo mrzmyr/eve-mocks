@@ -33,6 +33,11 @@ export type Mock = {
    */
   readonly documents?: (context: MockContext) => readonly MockDocument[];
   /**
+   * Initial state of one owner: an eval, or a session no eval created. The
+   * handlers of such a mock read and change `state`; `seed(t, …)` replaces it.
+   */
+  readonly createState?: (() => unknown) | undefined;
+  /**
    * Environment variables the mocked code path reads before it fetches.
    * Applied only where the variable is unset, so a real value always wins.
    */
@@ -75,21 +80,23 @@ export type PullContext = MockContext & {
 };
 
 /** What a route handler receives. */
-export type RouteContext = {
+export type RouteContext<State = undefined> = {
   /** The intercepted request, with its production URL. */
   readonly request: Request;
   /** Values of the path's `{param}` segments. */
   readonly params: Readonly<Record<string, string>>;
+  /** State of the eval or session the request belongs to; see the mock's `state`. */
+  readonly state: State;
 };
 
 /** Returns a `Response`, or any JSON value sent as 200. */
-export type RouteHandler = (context: RouteContext) => unknown;
+export type RouteHandler<State = undefined> = (context: RouteContext<State>) => unknown;
 
 /**
  * Pinned answers: path, then method. Paths use the OpenAPI `{param}` syntax so
  * they copy from the spec; methods are upper-case, as in `Request.method`.
  */
-export type Routes = Readonly<Record<string, Readonly<Record<string, RouteHandler>>>>;
+export type Routes<State = undefined> = Readonly<Record<string, Readonly<Record<string, RouteHandler<State>>>>>;
 
 /** A real upstream that stays reachable while the mocks are on. */
 export type Allowed = {
@@ -99,8 +106,14 @@ export type Allowed = {
   readonly isAllowed: true;
 };
 
+/** What a tool result receives besides the call's arguments. */
+export type ToolContext<State = undefined> = {
+  /** State of the eval or session the call belongs to; see the mock's `state`. */
+  readonly state: State;
+};
+
 /** Returns the JSON a tool call answers with; receives the call's arguments. */
-export type ToolResult = (args: Record<string, unknown>) => unknown;
+export type ToolResult<State = undefined> = (args: Record<string, unknown>, context: ToolContext<State>) => unknown;
 
 /** One intercepted call, as the preload appends it to the call log. */
 export type CallRecord = {
