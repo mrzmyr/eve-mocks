@@ -20,8 +20,9 @@ export default defineMcpMock({
 | Name | |
 | --- | --- |
 | `url` | Production MCP endpoint to intercept. `eve-mocks pull` reads `tools/list` from it. |
-| `results` | One answer per tool. The function receives the call's arguments and returns the JSON the tool answers with. |
+| `state` | Initial state per eve session. Optional. See [State](../mocks.md#state). |
+| `results` | One answer per tool. The function receives the call's arguments and `{ state }`, and returns the JSON the tool answers with. |
 
 The mock lists only the tools that have a result, so a read-only agent never sees `create_issue` unless you add it. Every key must name a tool in the pulled schema; a typo fails before the agent starts. Names, descriptions, and input schemas come from that file, so the model reads the same text as in production.
 
-The file name is the mock's name in `list` and in the run summary. The server is stateless: [Constraints](../constraints.md#mcp-mocks-are-stateless). How the file fits the run: [Mocks](../mocks.md).
+The file name is the mock's name in `list` and in the run summary. The MCP transport is stateless: [Constraints](../constraints.md#the-mcp-transport-is-stateless). How the file fits the run: [Mocks](../mocks.md).

@@ -12,5 +12,6 @@ export type {
   RouteContext,
   RouteHandler,
   Routes,
+  ToolContext,
   ToolResult,
 } from "./types.ts";

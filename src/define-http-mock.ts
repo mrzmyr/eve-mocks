@@ -10,6 +10,7 @@ import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getMocksDir } from "./get-mocks-dir.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
+import { loadState } from "./load-state.ts";
 import type { Mock, MockContext, Routes } from "./types.ts";
 
 /** A JSON object node of an OpenAPI document. */
@@ -191,17 +192,23 @@ function isRemote({ entry }: { readonly entry: string }): boolean {
  *   and is read in place, so the mock and the connection can share one file.
  *   An array merges the documents' operations, for several connections on one
  *   host; two documents declaring the same method and path stop the run.
+ * @param input.state - Initial state, created once per eval, or per session
+ *   no eval created. Routes read and change it through `context.state`, so a
+ *   write shows in the next read. Keep it JSON: an eval receives it through
+ *   `getState(t, …)`, and `seed(t, …)` replaces it.
  * @param input.routes - Pinned answers, path then method. With a `spec`,
  *   every route must name an operation it declares; `check` enforces it.
  */
-export function defineHttpMock({
+export function defineHttpMock<State = undefined>({
   url,
   spec,
+  state,
   routes = {},
 }: {
   readonly url: string;
   readonly spec?: string | readonly string[];
-  readonly routes?: Routes;
+  readonly state?: () => State;
+  readonly routes?: Routes<State>;
 }): Mock {
   let basePath = new URL(url).pathname;
 
@@ -308,6 +315,7 @@ export function defineHttpMock({
   return {
     url,
     type: "http",
+    createState: state,
     handle: async (request, context) => {
       const loaded = loadSpec(context);
       const path = new URL(request.url).pathname.slice(basePath.length);
@@ -341,7 +349,17 @@ export function defineHttpMock({
       const handler = routes[template]?.[request.method];
 
       if (handler) {
-        return toResponse(await handler({ request, params }));
+        if (state === undefined) {
+          return toResponse(await handler({ request, params, state: undefined as State }));
+        }
+
+        const loaded = await loadState({ mock: context.name, create: state });
+
+        try {
+          return toResponse(await handler({ request, params, state: loaded.state as State }));
+        } finally {
+          await loaded.save();
+        }
       }
 
       const operation = loaded[template]?.[request.method];

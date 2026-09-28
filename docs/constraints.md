@@ -30,12 +30,20 @@ eve gives an eval no ID, so `mock(t, …)` relies on two parts of eve that eve d
 
 If a future eve release changes either one, pinned answers stop applying and the mock file answers instead. See [Evals](evals.md).
 
-## MCP mocks are stateless
+## The MCP transport is stateless
 
-eve's MCP client calls tools without an `mcp-session-id` header, as the hosted
+This is about the protocol, not the data: a mock can keep
+[state](mocks.md#state). eve's MCP client calls tools without an `mcp-session-id` header, as the hosted
 servers allow. A client that checks sessions gets `Missing mcp-session-id
 header` (HTTP 400). See the
 [transport spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#session-management).
+
+## State lives in the process that answers
+
+A mock's state is kept in memory by the process that handles the call, one per
+eve session. eve's dev server runs a session's steps, so a session sees one
+state. Code that calls the upstream from a separate process of its own starts
+from a fresh `state()` there. State is gone when the run ends.
 
 ## Every top-level file in `mocks/` is imported
 

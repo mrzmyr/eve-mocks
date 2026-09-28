@@ -7,6 +7,7 @@ import { createError } from "./errors.ts";
 import { readJson } from "./read-json.ts";
 import { getClosest } from "./get-closest.ts";
 import { getSchemaPath } from "./get-schema-path.ts";
+import { loadState } from "./load-state.ts";
 import type { Mock, MockContext, ToolResult } from "./types.ts";
 
 /**
@@ -43,18 +44,24 @@ type Tool = {
  *
  * @param input.url - Production MCP endpoint to intercept, and what
  *   `eve-mocks pull` reads the real `tools/list` from.
+ * @param input.state - Initial state, created once per eval, or per session
+ *   no eval created. Results read and change it through `context.state`, so a
+ *   write shows in the next read. Keep it JSON: an eval receives it through
+ *   `getState(t, …)`, and `seed(t, …)` replaces it.
  * @param input.results - Answer per tool. The mock lists exactly the tools
  *   that have one, so a read-only connection's mock never lists the upstream's
  *   mutations. Every key must name a tool of the schema file; `check`
  *   enforces it. eve filters tools by the connection's allow-list anyway, so a
  *   tool without a result is one the model could not call.
  */
-export function defineMcpMock({
+export function defineMcpMock<State = undefined>({
   url,
+  state,
   results,
 }: {
   readonly url: string;
-  readonly results: Readonly<Record<string, ToolResult>>;
+  readonly state?: () => State;
+  readonly results: Readonly<Record<string, ToolResult<State>>>;
 }): Mock {
   let pulled: readonly Tool[] | undefined;
 
@@ -96,6 +103,7 @@ export function defineMcpMock({
   return {
     url,
     type: "mcp",
+    createState: state,
     handle: async (request, context) => {
       // Imported on the first call: the preload runs in every process the
       // agent spawns, and most of them never talk to this server.
@@ -134,10 +142,22 @@ export function defineMcpMock({
           };
         }
 
-        // JSON text content: the shape MCP clients read from the hosted servers.
-        const text = JSON.stringify(result(args), null, 2);
+        if (state === undefined) {
+          // JSON text content: the shape MCP clients read from the hosted servers.
+          const text = JSON.stringify(await result(args, { state: undefined as State }), null, 2);
 
-        return { content: [{ type: "text", text }] };
+          return { content: [{ type: "text", text }] };
+        }
+
+        const loaded = await loadState({ mock: context.name, create: state });
+
+        try {
+          const text = JSON.stringify(await result(args, { state: loaded.state as State }), null, 2);
+
+          return { content: [{ type: "text", text }] };
+        } finally {
+          await loaded.save();
+        }
       });
 
       // No `sessionIdGenerator` means stateless.
