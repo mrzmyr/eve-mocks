@@ -3,3 +3,14 @@ a.blume-nav-link[href^="/api/"] {
   font-family: var(--blume-font-mono);
   font-size: 0.8125rem;
 }
+
+/* Steps render outside `prose`, so their lists lose the bullets. */
+[class~="[counter-reset:blume-step]"] ul {
+  margin-block: 0.75rem;
+  padding-inline-start: 1.25rem;
+  list-style-type: disc;
+}
+
+[class~="[counter-reset:blume-step]"] li + li {
+  margin-top: 0.25rem;
+}
