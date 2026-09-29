@@ -228,6 +228,20 @@ describe("mock(t, …) outside the wrapper", () => {
   });
 });
 
+describe("an eval run where no eval calls mock(t, …)", () => {
+  // Runs before any mock() below starts the runner's server, so the port the
+  // wrapper chose has no listener, as in a suite that never pins an answer.
+  test("the mock file answers a call inside a session", async () => {
+    const { mock: linear } = getMock({ name: "linear" });
+    const call = () => linear.handle(createToolCall({ name: "get_issue", args: { id: "ENG-1" } }), { name: "linear" });
+
+    expect(await readToolText({ response: await inSession({ sessionId: "session_unpinned", work: call }) })).toEqual({
+      id: "ENG-1",
+      title: "from the mock file",
+    });
+  });
+});
+
 describe("mock(t, …)", () => {
   test("an MCP tool is answered for the eval's session, the mock file answers every other", async () => {
     const t = createContext();

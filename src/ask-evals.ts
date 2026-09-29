@@ -56,6 +56,42 @@ function getBase(): string | undefined {
   return `http://127.0.0.1:${port}`;
 }
 
+/** Whether `fetch` failed because nothing listens: Node puts the code on the cause, Bun on the error. */
+function isConnectionRefused({ error }: { readonly error: unknown }): boolean {
+  const { code, cause } = error as { readonly code?: unknown; readonly cause?: { readonly code?: unknown } };
+
+  return code === "ConnectionRefused" || cause?.code === "ECONNREFUSED";
+}
+
+/**
+ * POST `body` to the runner, or none when nothing listens. The runner starts
+ * its server on the first `mock(t, …)`, so a suite that never pins an answer
+ * has no listener on the wrapper's port.
+ */
+async function postToRunner({
+  base,
+  route,
+  body,
+}: {
+  readonly base: string;
+  readonly route: string;
+  readonly body: unknown;
+}): Promise<Response | undefined> {
+  try {
+    return await fetch(`${base}${route}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    if (isConnectionRefused({ error })) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
 /**
  * The reply of the eval that owns the current session, or none: no eval
  * pinned this operation for it, or the call happens outside an eval.
@@ -79,13 +115,9 @@ export async function askEvals({
   }
 
   const input: CallInput = { mock, key, sessionId, call };
-  const response = await fetch(`${base}${CALL_ROUTE}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  const response = await postToRunner({ base, route: CALL_ROUTE, body: input });
 
-  if (response.status === 204) {
+  if (response === undefined || response.status === 204) {
     return undefined;
   }
 
@@ -112,11 +144,12 @@ export async function listEvalOperations({ mock }: { readonly mock: string }): P
     return [];
   }
 
-  const response = await fetch(`${base}${OPERATIONS_ROUTE}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ mock, sessionId }),
-  });
+  const response = await postToRunner({ base, route: OPERATIONS_ROUTE, body: { mock, sessionId } });
+
+  if (response === undefined) {
+    return [];
+  }
+
   const { operations } = (await response.json()) as { readonly operations: readonly string[] };
 
   return operations;
@@ -132,13 +165,9 @@ export async function askSeed({ mock }: { readonly mock: string }): Promise<Stat
   }
 
   const input: StateInput = { mock, sessionId };
-  const response = await fetch(`${base}${STATE_ROUTE}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  const response = await postToRunner({ base, route: STATE_ROUTE, body: input });
 
-  if (response.status === 204) {
+  if (response === undefined || response.status === 204) {
     return undefined;
   }
 
@@ -156,9 +185,5 @@ export async function sendState({ mock, state }: { readonly mock: string; readon
 
   const input: SaveInput = { mock, sessionId, state };
 
-  await fetch(`${base}${SAVE_ROUTE}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  await postToRunner({ base, route: SAVE_ROUTE, body: input });
 }
